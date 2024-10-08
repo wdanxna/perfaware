@@ -1,0 +1,25 @@
+cmake_minimum_required(VERSION 3.10)
+
+# Set the project name
+project(sim86)
+
+# Add all .cpp files in the sim86 directory to the library
+file(GLOB SIM86_SOURCES "sim86/sim86_lib.cpp")
+
+# Create a static library target
+add_library(sim86 STATIC ${SIM86_SOURCES})
+
+# Specify the include directories for the target
+target_include_directories(sim86 INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/sim86)
+
+# Specify the interface header file
+target_sources(sim86 INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/sim86/sim86_lib.h)
+
+add_executable(main main.cpp)
+
+# Link the executable target with the sim86 library
+target_link_libraries(main PRIVATE sim86)
+
+set_target_properties(sim86 PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES)
+set_target_properties(main PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES)
+

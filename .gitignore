@@ -1,3 +1,5 @@
 disasm
 .vscode
-disasm.dSYM
+*.dSYM
+build
+main
