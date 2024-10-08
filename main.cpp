@@ -91,25 +91,53 @@ void execute(sim_context& ctx, instruction& inst) {
                 auto& reg = inst.Operands[0].Register;
                 auto& imm = inst.Operands[1].Immediate;
                 //just for 16bits registers
-                auto old_val = read_register<uint16_t>(reg, ctx.reg);
-                write_register<uint16_t>(reg, ctx.reg, imm.Value);
+                //dynamic distach the type
+                register_access reg_x = {
+                    .Index = reg.Index, 
+                    .Offset = 0, 
+                    .Count = 2};
+
+                auto old_val = read_register<uint16_t>(reg_x, ctx.reg);
+
+                if (reg.Count == 2) {
+                    write_register<uint16_t>(reg, ctx.reg, imm.Value);
+                }
+                else {
+                    write_register<uint8_t>(reg, ctx.reg, imm.Value);
+                }
+
                 print_instruction(inst);
+                //always print 16bits register value
                 printf("; %s: 0x%X -> 0x%X\n", 
-                    Sim86_RegisterNameFromOperand(&reg), 
+                    Sim86_RegisterNameFromOperand(&reg_x), 
                     old_val, 
-                    read_register<uint16_t>(reg, ctx.reg));
+                    read_register<uint16_t>(reg_x, ctx.reg));
             }
         else if (inst.Operands[0].Type == Operand_Register &&
                 inst.Operands[1].Type == Operand_Register) {
                     auto& dest = inst.Operands[0].Register;
                     auto& src = inst.Operands[1].Register;
-                    auto old_val = read_register<uint16_t>(dest, ctx.reg);
-                    write_register<uint16_t>(dest, ctx.reg, read_register<uint16_t>(src, ctx.reg));
+                    assert(dest.Count == src.Count);
+
+                    register_access reg_x = {
+                    .Index = dest.Index, 
+                    .Offset = 0, 
+                    .Count = 2};
+                    
+                    auto old_val = read_register<uint16_t>(reg_x, ctx.reg);
+
+                    if (dest.Count == 2) {
+                        write_register<uint16_t>(dest, ctx.reg, read_register<uint16_t>(src, ctx.reg));
+                    }
+                    else {
+                        write_register<uint8_t>(dest, ctx.reg, read_register<uint8_t>(src, ctx.reg));
+                    }
+
                     print_instruction(inst);
                     printf("; %s: 0x%X -> 0x%X\n", 
                         Sim86_RegisterNameFromOperand(&dest), 
                         old_val, 
-                        read_register<uint16_t>(dest, ctx.reg));
+                        read_register<uint16_t>(reg_x, ctx.reg));
                 }
         break;
     }
@@ -125,7 +153,7 @@ int main(int argc, char *argv[]) {
 
     sim_context context;
     context.memory = new u8[1024*1024];//1 MB
-    context.reg = new u8[8 * 2]{}; //8 2bytes registers
+    context.reg = new u8[11 * 2]{}; //11 2bytes registers
 
     char* FileName = argv[1];
     u32 bytes = load_memory_from_file(FileName, context.memory);

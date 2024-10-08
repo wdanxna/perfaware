@@ -12,3 +12,6 @@ I decided to use Casys's Sim86 as basis for future assignments since its data st
 Implementation: use Sim86 to decode (deseriallize) the binary into data structure one instruction at a time, setup a context data structure to represent a 8086 machine, which now is just a 1MB buffer for memory and 8*2 bytes buffer for registers. write an `execute` function which receives a instruction and a context, which will update the context based on the instruction.
 
 the current `execute` is implemented with just 2 ugly if-elses for simulating the 2 MOVs that LISTING 43 required.
+
+----
+Do challenge LISTING 45, be able to read/write into 8bit registers. write a utility tempalte function `read_register` and `wirte_register` that can operate on buffers in accordance with type been specified. A dynamic dispatch (with if-elses) seems needed in order to discern which register to access
