@@ -4,6 +4,66 @@
 #include <string.h>
 #include <assert.h>
 
+
+enum register_mapping_8086
+{
+    Register_none,
+    
+    Register_a,
+    Register_b,
+    Register_c,
+    Register_d,
+    Register_sp,
+    Register_bp,
+    Register_si,
+    Register_di,
+    Register_es,
+    Register_cs,
+    Register_ss,
+    Register_ds,
+    Register_ip,
+    Register_flags,
+    
+    Register_count,
+};
+
+#define GReg(name) \
+        union {\
+            struct {\
+                u8 name##l, name##h;\
+            };\
+            u16 name##x;\
+        };
+
+struct Registers {
+    union {
+        struct {
+            GReg(a)
+            GReg(b)
+            GReg(c)
+            GReg(d)
+            u16 sp;
+            u16 bp;
+            u16 si;
+            u16 di;
+            u16 es;
+            u16 cs;
+            u16 ss;
+            u16 ds;
+            u16 ip;
+            u16 flags;
+        };
+        u8 mem[14*2];
+    };
+};
+
+struct sim_context {
+    u8 memory[1024*1024];
+    Registers reg;
+    bool S_Flag, Z_Flag;
+};
+
+
 u32 load_memory_from_file(char *FileName, u8 *memory)
 {
     u32 read = 0;
@@ -67,11 +127,6 @@ void print_instruction(const instruction& inst) {
     }
 }
 
-struct sim_context {
-    u8* memory;
-    u8* reg;
-    bool S_Flag, Z_Flag;
-};
 
 template<typename T>
 T read_register(const register_access& regtype, const u8* reg) {
@@ -93,7 +148,7 @@ rm_access build_rm_access(sim_context& ctx, instruction_operand& operand) {
     rm_access ret{};
     if (operand.Type == Operand_Register) {
         auto& reg = operand.Register;
-        ret.p = &ctx.reg[(reg.Index-1)*2 + reg.Offset];
+        ret.p = &ctx.reg.mem[(reg.Index-1)*2 + reg.Offset];
         ret.s = reg.Count;
     }
     else if (operand.Type == Operand_Memory) {
@@ -149,13 +204,13 @@ void execute(sim_context& ctx, instruction& inst) {
                     .Offset = 0, 
                     .Count = 2};
 
-                auto old_val = read_register<uint16_t>(reg_x, ctx.reg);
+                auto old_val = read_register<uint16_t>(reg_x, ctx.reg.mem);
 
                 if (reg.Count == 2) {
-                    write_register<uint16_t>(reg, ctx.reg, imm.Value);
+                    write_register<uint16_t>(reg, ctx.reg.mem, imm.Value);
                 }
                 else {
-                    write_register<uint8_t>(reg, ctx.reg, imm.Value);
+                    write_register<uint8_t>(reg, ctx.reg.mem, imm.Value);
                 }
 
                 print_instruction(inst);
@@ -163,7 +218,7 @@ void execute(sim_context& ctx, instruction& inst) {
                 printf("; %s: 0x%X -> 0x%X\n", 
                     Sim86_RegisterNameFromOperand(&reg_x), 
                     old_val, 
-                    read_register<uint16_t>(reg_x, ctx.reg));
+                    read_register<uint16_t>(reg_x, ctx.reg.mem));
             }
         else if (inst.Operands[0].Type == Operand_Register &&
                 inst.Operands[1].Type == Operand_Register) {
@@ -176,20 +231,20 @@ void execute(sim_context& ctx, instruction& inst) {
                     .Offset = 0, 
                     .Count = 2};
                     
-                    auto old_val = read_register<uint16_t>(reg_x, ctx.reg);
+                    auto old_val = read_register<uint16_t>(reg_x, ctx.reg.mem);
 
                     if (dest.Count == 2) {
-                        write_register<uint16_t>(dest, ctx.reg, read_register<uint16_t>(src, ctx.reg));
+                        write_register<uint16_t>(dest, ctx.reg.mem, read_register<uint16_t>(src, ctx.reg.mem));
                     }
                     else {
-                        write_register<uint8_t>(dest, ctx.reg, read_register<uint8_t>(src, ctx.reg));
+                        write_register<uint8_t>(dest, ctx.reg.mem, read_register<uint8_t>(src, ctx.reg.mem));
                     }
 
                     print_instruction(inst);
                     printf("; %s: 0x%X -> 0x%X\n", 
                         Sim86_RegisterNameFromOperand(&dest), 
                         old_val, 
-                        read_register<uint16_t>(reg_x, ctx.reg));
+                        read_register<uint16_t>(reg_x, ctx.reg.mem));
                 }
         break;
     }
@@ -241,37 +296,11 @@ void execute(sim_context& ctx, instruction& inst) {
     }
 }
 
-
-enum register_mapping_8086
-{
-    Register_none,
-    
-    Register_a,
-    Register_b,
-    Register_c,
-    Register_d,
-    Register_sp,
-    Register_bp,
-    Register_si,
-    Register_di,
-    Register_es,
-    Register_cs,
-    Register_ss,
-    Register_ds,
-    Register_ip,
-    Register_flags,
-    
-    Register_count,
-};
-
 int main(int argc, char *argv[]) {
-
     //feed a file
     assert(argc > 1);
 
     sim_context context;
-    context.memory = new u8[1024*1024];//1 MB
-    context.reg = new u8[11 * 2]{}; //11 2bytes registers
 
     char* FileName = argv[1];
     u32 bytes = load_memory_from_file(FileName, context.memory);
@@ -289,15 +318,12 @@ int main(int argc, char *argv[]) {
     } while (inst.Op != Op_None && bytes > 0);
     
     printf("Final Registers: \n");
-    printf("    bx: 0x%X\n", read_register<uint16_t>({Register_b, 0, 2}, context.reg));
-    printf("    cx: 0x%X\n", read_register<uint16_t>({Register_c, 0, 2}, context.reg));
-    printf("    sp: 0x%X\n", read_register<uint16_t>({Register_sp, 0, 2}, context.reg));
+    printf("    bx: 0x%X\n", read_register<uint16_t>({Register_b, 0, 2}, context.reg.mem));
+    printf("    cx: 0x%X\n", read_register<uint16_t>({Register_c, 0, 2}, context.reg.mem));
+    printf("    sp: 0x%X\n", read_register<uint16_t>({Register_sp, 0, 2}, context.reg.mem));
     printf("flags: ");
     if (context.Z_Flag) printf("Z");
     if (context.S_Flag) printf("S");
-
-    delete[] context.memory;
-    delete[] context.reg;
-    return 0;
+    return 0; 
 }
 
