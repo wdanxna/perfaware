@@ -189,6 +189,7 @@ void rm_access_write(rm_access& o, s32 value) {
 }
 
 void execute(sim_context& ctx, instruction& inst) {
+    print_instruction(inst);
     switch (inst.Op)
     {
     case Op_mov: {
@@ -213,9 +214,8 @@ void execute(sim_context& ctx, instruction& inst) {
                     write_register<uint8_t>(reg, ctx.reg.mem, imm.Value);
                 }
 
-                print_instruction(inst);
                 //always print 16bits register value
-                printf("; %s: 0x%X -> 0x%X\n", 
+                printf("; %s: 0x%X -> 0x%X", 
                     Sim86_RegisterNameFromOperand(&reg_x), 
                     old_val, 
                     read_register<uint16_t>(reg_x, ctx.reg.mem));
@@ -239,9 +239,7 @@ void execute(sim_context& ctx, instruction& inst) {
                     else {
                         write_register<uint8_t>(dest, ctx.reg.mem, read_register<uint8_t>(src, ctx.reg.mem));
                     }
-
-                    print_instruction(inst);
-                    printf("; %s: 0x%X -> 0x%X\n", 
+                    printf("; %s: 0x%X -> 0x%X", 
                         Sim86_RegisterNameFromOperand(&dest), 
                         old_val, 
                         read_register<uint16_t>(reg_x, ctx.reg.mem));
@@ -281,7 +279,7 @@ void execute(sim_context& ctx, instruction& inst) {
         bool old_s = ctx.S_Flag;
         ctx.Z_Flag = (o1.s == 1 ? (v8 == 0) : (v16 == 0));
         ctx.S_Flag = (o1.s == 1 ? (v8 < (s8)0) : (v16 < (s16)0));
-        print_instruction(inst);
+
         if (old_z != ctx.Z_Flag || old_s != ctx.S_Flag) {
             printf("Flag: ");
             if (!old_z && ctx.Z_Flag) printf("->Z");
@@ -289,11 +287,19 @@ void execute(sim_context& ctx, instruction& inst) {
             if (!old_s && ctx.S_Flag) printf("->S");
             if (old_s && !ctx.S_Flag) printf("S->");
         }
-        printf("\n");
+    } break;
+    case Op_jne: {
+        //jump on not equal to zero
+        s16 offset = inst.Operands[0].Immediate.Value;
+        if (!ctx.Z_Flag) 
+            ctx.reg.ip += offset;
     } break;
     default:
         break;
     }
+
+    printf(" ip: 0x%X \n", 
+    read_register<uint16_t>({Register_ip, 0, 2}, ctx.reg.mem));
 }
 
 int main(int argc, char *argv[]) {
@@ -307,20 +313,21 @@ int main(int argc, char *argv[]) {
     assert(bytes > 0);
 
     instruction inst{};
-    u8* head = context.memory;
+    context.reg.ip = 0;
     do {
-        head += inst.Size;
-        Sim86_Decode8086Instruction(bytes, head, &inst);
+        //calcuate absolute address
+        auto addr = context.memory + context.reg.ip;
+        Sim86_Decode8086Instruction(bytes, addr, &inst);
+        context.reg.ip += inst.Size;
 
         execute(context, inst);
 
-        bytes -= inst.Size;
-    } while (inst.Op != Op_None && bytes > 0);
+    } while (inst.Op != Op_None && context.reg.ip < bytes);
     
     printf("Final Registers: \n");
     printf("    bx: 0x%X\n", read_register<uint16_t>({Register_b, 0, 2}, context.reg.mem));
-    printf("    cx: 0x%X\n", read_register<uint16_t>({Register_c, 0, 2}, context.reg.mem));
-    printf("    sp: 0x%X\n", read_register<uint16_t>({Register_sp, 0, 2}, context.reg.mem));
+    printf("    ip: 0x%X\n", read_register<uint16_t>({Register_ip, 0, 2}, context.reg.mem));
+    // printf("    sp: 0x%X\n", read_register<uint16_t>({Register_sp, 0, 2}, context.reg.mem));
     printf("flags: ");
     if (context.Z_Flag) printf("Z");
     if (context.S_Flag) printf("S");
