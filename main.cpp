@@ -70,6 +70,7 @@ void print_instruction(const instruction& inst) {
 struct sim_context {
     u8* memory;
     u8* reg;
+    bool S_Flag, Z_Flag;
 };
 
 template<typename T>
@@ -79,6 +80,57 @@ T read_register(const register_access& regtype, const u8* reg) {
 template<typename T>
 void write_register(const register_access& regtype, u8* reg, T val) {
     *((T*)&reg[(regtype.Index-1)*2 + regtype.Offset]) =  val;
+}
+
+//register/memory access
+struct rm_access {
+    u8* p;//pointer to the memory
+    size_t s; //how many bytes to read & write
+    s32 val; //to store immediate
+};
+
+rm_access build_rm_access(sim_context& ctx, instruction_operand& operand) {
+    rm_access ret{};
+    if (operand.Type == Operand_Register) {
+        auto& reg = operand.Register;
+        ret.p = &ctx.reg[(reg.Index-1)*2 + reg.Offset];
+        ret.s = reg.Count;
+    }
+    else if (operand.Type == Operand_Memory) {
+        auto& addr = operand.Address;
+        assert(false);//implement later
+    }
+    else if (operand.Type == Operand_Immediate) {
+        ret.val = operand.Immediate.Value;
+    }
+    return ret;
+}
+
+s32 rm_access_read(rm_access& access) {
+    if (access.s == 1) {
+        return (s32)(*access.p);
+    }
+    else if (access.s == 2) {
+        return (s32)*((uint16_t*)access.p);
+    }
+    else if (access.s == 0) {
+        return (s32)access.val;
+    }
+    assert(false);
+    return 0;
+}
+
+void rm_access_write(rm_access& o, s32 value) {
+    if (o.s == 1) {
+        *o.p = (s8)value;
+    }
+    else if (o.s == 2) {
+        *((s16*)o.p) = (s16)value;
+    }
+    else {
+        //immediate can't be written
+        assert(false);
+    }
 }
 
 void execute(sim_context& ctx, instruction& inst) {
@@ -141,10 +193,76 @@ void execute(sim_context& ctx, instruction& inst) {
                 }
         break;
     }
+    case Op_add:
+    case Op_cmp:
+    case Op_sub: {
+        auto op1 = inst.Operands[0];
+        auto op2 = inst.Operands[1];
+        //like Casy's code, I'll try to build a "access" object to unify
+        //the read/write operations to both memory and registers
+        rm_access o1 = build_rm_access(ctx, op1);
+        rm_access o2 = build_rm_access(ctx, op2);
+        auto v1 = rm_access_read(o1);
+        auto v2 = rm_access_read(o2);
+        s32 v = {};
+        if (inst.Op == Op_add) {
+            v = v1 + v2;
+        }
+        else if (inst.Op == Op_sub || inst.Op == Op_cmp) {
+            v = v1 - v2;
+        }
+
+        if (inst.Op != Op_cmp) {
+            rm_access_write(o1, v);
+        }
+        s16 v16;s8 v8;
+        if (o1.s == 1) {
+            v8 = v;
+        }
+        else if (o1.s == 2) {
+            v16 = v;
+        }
+        bool old_z = ctx.Z_Flag;
+        bool old_s = ctx.S_Flag;
+        ctx.Z_Flag = (o1.s == 1 ? (v8 == 0) : (v16 == 0));
+        ctx.S_Flag = (o1.s == 1 ? (v8 < (s8)0) : (v16 < (s16)0));
+        print_instruction(inst);
+        if (old_z != ctx.Z_Flag || old_s != ctx.S_Flag) {
+            printf("Flag: ");
+            if (!old_z && ctx.Z_Flag) printf("->Z");
+            if (old_z && !ctx.Z_Flag) printf("Z->");
+            if (!old_s && ctx.S_Flag) printf("->S");
+            if (old_s && !ctx.S_Flag) printf("S->");
+        }
+        printf("\n");
+    } break;
     default:
         break;
     }
 }
+
+
+enum register_mapping_8086
+{
+    Register_none,
+    
+    Register_a,
+    Register_b,
+    Register_c,
+    Register_d,
+    Register_sp,
+    Register_bp,
+    Register_si,
+    Register_di,
+    Register_es,
+    Register_cs,
+    Register_ss,
+    Register_ds,
+    Register_ip,
+    Register_flags,
+    
+    Register_count,
+};
 
 int main(int argc, char *argv[]) {
 
@@ -170,6 +288,13 @@ int main(int argc, char *argv[]) {
         bytes -= inst.Size;
     } while (inst.Op != Op_None && bytes > 0);
     
+    printf("Final Registers: \n");
+    printf("    bx: 0x%X\n", read_register<uint16_t>({Register_b, 0, 2}, context.reg));
+    printf("    cx: 0x%X\n", read_register<uint16_t>({Register_c, 0, 2}, context.reg));
+    printf("    sp: 0x%X\n", read_register<uint16_t>({Register_sp, 0, 2}, context.reg));
+    printf("flags: ");
+    if (context.Z_Flag) printf("Z");
+    if (context.S_Flag) printf("S");
 
     delete[] context.memory;
     delete[] context.reg;
