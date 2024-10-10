@@ -3,3 +3,4 @@ disasm
 *.dSYM
 build
 main
+dump.data

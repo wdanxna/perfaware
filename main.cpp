@@ -304,6 +304,13 @@ int main(int argc, char *argv[]) {
     printf("flags: ");
     if (context.Z_Flag) printf("Z");
     if (context.S_Flag) printf("S");
+
+    //dump first 64*64*4 bytes memory to a file
+    FILE* dumpfd = fopen("dump.data", "wb");
+    if (dumpfd) {
+        fwrite((void*)context.memory, 1, 64*64*5, dumpfd);
+        fclose(dumpfd);
+    }
     return 0; 
 }
 
