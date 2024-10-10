@@ -6,6 +6,9 @@ again, runtime dispatch seems neccessary to distinguish between different regist
 ---
 Redesigned register storage, make it more explicit.
 implement ip manipulation, simulating jne instruction, completing LISTING 48, 49.
+---
+Unify the operand access throuh rm_access object for `MOV`. completing LISTING 51, 52.
+simulating memory access without considering segment registers and 8bits registers, so only 64K is addressable.
 
 ## 9/10/2024
 I decided to use Casys's Sim86 as basis for future assignments since its data structure is better designed and I want to study its code and design style. I imported its Sim86 as library into my homework workspace, write a main.cpp for assignment 4 which is simulating `MOV reg, imm` and `MOV reg, reg` instructions.

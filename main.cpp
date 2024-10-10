@@ -94,7 +94,10 @@ void print_operand(const instruction_operand& op, char* text) {
     }
     case Operand_Memory: {
         //TODO: print all terms?
-        sprintf(text, "0x%X", op.Address.Displacement);
+        sprintf(text, "[%s + %s + 0x%X]", 
+            Sim86_RegisterNameFromOperand((register_access*)&op.Address.Terms[0].Register), 
+            Sim86_RegisterNameFromOperand((register_access*)&op.Address.Terms[1].Register),
+            op.Address.Displacement);
         break;
     }
     default:
@@ -152,8 +155,23 @@ rm_access build_rm_access(sim_context& ctx, instruction_operand& operand) {
         ret.s = reg.Count;
     }
     else if (operand.Type == Operand_Memory) {
-        auto& addr = operand.Address;
-        assert(false);//implement later
+        auto& access = operand.Address;
+        //ignore segment registers, just accessing 64k memory
+        auto r1 = access.Terms[0].Register;
+        auto r2 = access.Terms[1].Register;
+        //only dealing with 16bits registers, ignoring 8bits registers
+        assert(r1.Count == 2 && r2.Count == 2);
+
+        auto term1 = (r1.Index == Register_none)
+            ? 0 
+            : read_register<u16>(r1, ctx.reg.mem);
+        auto term2 = (r2.Index == Register_none)
+            ? 0
+            : read_register<u16>(r2, ctx.reg.mem);
+        //absolute address = [term1 + term1 + disp]
+        u16 addr = term1 + term2 + access.Displacement;
+        ret.p = ctx.memory + addr;
+        ret.s = 2;//only read&write 2 bytes
     }
     else if (operand.Type == Operand_Immediate) {
         ret.val = operand.Immediate.Value;
@@ -193,59 +211,11 @@ void execute(sim_context& ctx, instruction& inst) {
     switch (inst.Op)
     {
     case Op_mov: {
-        //only consider immediate to register mov for LISTING 43
-        if (inst.Operands[0].Type == Operand_Register &&
-            inst.Operands[1].Type == Operand_Immediate) {
-                auto& reg = inst.Operands[0].Register;
-                auto& imm = inst.Operands[1].Immediate;
-                //just for 16bits registers
-                //dynamic distach the type
-                register_access reg_x = {
-                    .Index = reg.Index, 
-                    .Offset = 0, 
-                    .Count = 2};
+        rm_access o1 = build_rm_access(ctx, inst.Operands[0]);
+        rm_access o2 = build_rm_access(ctx, inst.Operands[1]);
 
-                auto old_val = read_register<uint16_t>(reg_x, ctx.reg.mem);
-
-                if (reg.Count == 2) {
-                    write_register<uint16_t>(reg, ctx.reg.mem, imm.Value);
-                }
-                else {
-                    write_register<uint8_t>(reg, ctx.reg.mem, imm.Value);
-                }
-
-                //always print 16bits register value
-                printf("; %s: 0x%X -> 0x%X", 
-                    Sim86_RegisterNameFromOperand(&reg_x), 
-                    old_val, 
-                    read_register<uint16_t>(reg_x, ctx.reg.mem));
-            }
-        else if (inst.Operands[0].Type == Operand_Register &&
-                inst.Operands[1].Type == Operand_Register) {
-                    auto& dest = inst.Operands[0].Register;
-                    auto& src = inst.Operands[1].Register;
-                    assert(dest.Count == src.Count);
-
-                    register_access reg_x = {
-                    .Index = dest.Index, 
-                    .Offset = 0, 
-                    .Count = 2};
-                    
-                    auto old_val = read_register<uint16_t>(reg_x, ctx.reg.mem);
-
-                    if (dest.Count == 2) {
-                        write_register<uint16_t>(dest, ctx.reg.mem, read_register<uint16_t>(src, ctx.reg.mem));
-                    }
-                    else {
-                        write_register<uint8_t>(dest, ctx.reg.mem, read_register<uint8_t>(src, ctx.reg.mem));
-                    }
-                    printf("; %s: 0x%X -> 0x%X", 
-                        Sim86_RegisterNameFromOperand(&dest), 
-                        old_val, 
-                        read_register<uint16_t>(reg_x, ctx.reg.mem));
-                }
-        break;
-    }
+        rm_access_write(o1, rm_access_read(o2));
+    } break;
     case Op_add:
     case Op_cmp:
     case Op_sub: {
@@ -325,9 +295,12 @@ int main(int argc, char *argv[]) {
     } while (inst.Op != Op_None && context.reg.ip < bytes);
     
     printf("Final Registers: \n");
-    printf("    bx: 0x%X\n", read_register<uint16_t>({Register_b, 0, 2}, context.reg.mem));
-    printf("    ip: 0x%X\n", read_register<uint16_t>({Register_ip, 0, 2}, context.reg.mem));
-    // printf("    sp: 0x%X\n", read_register<uint16_t>({Register_sp, 0, 2}, context.reg.mem));
+    printf("    bx: 0x%X\n", context.reg.bx);
+    printf("    cx: 0x%X\n", context.reg.cx);
+    printf("    dx: 0x%X\n", context.reg.dx);
+    printf("    bp: 0x%X\n", context.reg.bp);
+    printf("    si: 0x%X\n", context.reg.si);
+    printf("    ip: 0x%X\n", context.reg.ip);
     printf("flags: ");
     if (context.Z_Flag) printf("Z");
     if (context.S_Flag) printf("S");
