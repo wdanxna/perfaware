@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <unordered_map>
 
 
 enum register_mapping_8086
@@ -108,7 +109,7 @@ void print_operand(const instruction_operand& op, char* text) {
 
 void print_instruction(const instruction& inst) {
     const char* op = Sim86_MnemonicFromOperationType(inst.Op);
-    char dest[16]{}, src[16]{};
+    char dest[25]{}, src[25]{};
     u16 operand_cnt = 0;
     if (inst.Operands[0].Type != Operand_None) {
         operand_cnt++;
@@ -206,6 +207,121 @@ void rm_access_write(rm_access& o, s32 value) {
     }
 }
 
+u32 estimate_cycles(instruction& inst, char* explain) {
+    static std::unordered_map<operation_type,//op
+        std::unordered_map<operand_type,//src
+            std::unordered_map<operand_type, //dest
+                std::pair<u32, u32>> //clocks, panelty
+                >> tb_clocks = {
+                {Op_mov, {
+                    {Operand_Register, 
+                        {
+                            {Operand_Register, {2, 0}},
+                            {Operand_Memory, {9, 1}}
+                        }
+                    },
+                    {Operand_Memory,
+                        {
+                            {Operand_Register, {8, 1}}
+                        }
+                    },
+                    {Operand_Immediate,
+                        {
+                            {Operand_Register, {4, 0}},
+                            {Operand_Memory, {10, 1}}
+                        }
+                    }
+                }},
+                {Op_add, {
+                    {Operand_Register, {
+                        {Operand_Register, {3, 0}},
+                        {Operand_Memory, {16, 2}}
+                    }},
+                    {Operand_Memory, {
+                        {Operand_Register, {9, 1}}
+                    }},
+                    {Operand_Immediate, {
+                        {Operand_Register, {4, 0}},
+                        {Operand_Memory, {17, 2}}
+                    }}
+                }}
+            };
+
+    auto effective_address_cost = [](instruction_operand& o) -> u32 {
+        auto& addr = o.Address;
+        auto& base = addr.Terms[0].Register;
+        auto& index = addr.Terms[1].Register;
+        auto disp = addr.Displacement;
+        u32 ret = 0;
+        //Displacement only
+        if (base.Index == Register_none &&
+            index.Index == Register_none &&
+            disp != 0) {
+                ret = 6;
+            }
+        else {
+            //base+index
+            if (base.Index != Register_none &&
+                index.Index != Register_none) {
+                
+                if (base.Index == Register_bp) {
+                    //bp + di
+                    if (index.Index == Register_di) {
+                        ret = 7;
+                    }
+                    //bp + si
+                    else if (index.Index == Register_si) {
+                        ret = 8;
+                    }
+                }
+                else if (base.Index == Register_b) {
+                    if (index.Index == Register_si) {
+                        ret = 7;
+                    }
+                    else if (index.Index == Register_di) {
+                        ret = 8;
+                    }
+                }
+                if (disp != 0) {
+                    ret += 4;
+                }
+            }
+            else {
+                //only base or index
+                if (disp == 0)
+                    ret = 5;
+                //disp + base or index
+                else
+                    ret = 9;
+            }
+        }
+        return ret;
+    };
+
+    auto [base, pscale] = tb_clocks[inst.Op][inst.Operands[1].Type][inst.Operands[0].Type];
+    u32 ret = base;
+    instruction_operand* memop{};
+    if (inst.Operands[0].Type == Operand_Memory) memop = &inst.Operands[0];
+    else if (inst.Operands[1].Type == Operand_Memory) memop = &inst.Operands[1];
+    if (memop) {
+        //if any of the operands involves memory, add effective address cost
+        auto ea = effective_address_cost(*memop);
+        auto p = 0;
+        if (memop->Address.Displacement & 1) {
+            p = pscale * 4;
+        }
+        explain += sprintf(explain, "%d + %dea", base, ea);
+        if (p) {
+            sprintf(explain, " + %dp", p);
+        }
+
+        ret += ea + p;
+
+    }
+    return ret;
+}
+
+static u32 total_cycles = 0;
 void execute(sim_context& ctx, instruction& inst) {
     print_instruction(inst);
     switch (inst.Op)
@@ -266,6 +382,13 @@ void execute(sim_context& ctx, instruction& inst) {
     } break;
     default:
         break;
+    }
+
+    if (inst.Op == Op_mov || inst.Op == Op_add) {
+        char explain[20]{}; 
+        auto cycles = estimate_cycles(inst, explain);
+        total_cycles += cycles;
+        printf("; Clocks: +%d = %d (%s)", cycles, total_cycles, explain);
     }
 
     printf(" ip: 0x%X \n", 

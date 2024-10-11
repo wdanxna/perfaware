@@ -1,4 +1,6 @@
 My homework assignment for performance awareness programming
+## 11/10/2024
+calcuate estimate cycle count, completing LISTING 56 and challenge LISTING 57
 
 ## 10/10/2024
 
