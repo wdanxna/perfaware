@@ -4,3 +4,6 @@ disasm
 build
 main
 dump.data
+.DS_Store
+part2/haversine_generator
+*.json

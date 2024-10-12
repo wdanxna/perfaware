@@ -1,4 +1,11 @@
 My homework assignment for performance awareness programming
+## 12/10/2024
+write a haversine json generator, implemented 2 generating mode: unifrom and cluster, in which, uniform mode generate
+haversine piars uniformally across entire x and y, whereas cluster mode generate first by choosing 64 cluster randomly
+then populate each cluster with pairs that confined inside a specific range (30 degree range both vertically and horizontally).
+it then will calculate the haversine value using reference haversine function provided for each pair during generation. Lastly, it will calculate a average among all haversine value and output a report to standard output.
+
+
 ## 11/10/2024
 calcuate estimate cycle count, completing LISTING 56 and challenge LISTING 57
 
