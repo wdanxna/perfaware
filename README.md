@@ -1,4 +1,9 @@
 My homework assignment for performance awareness programming
+## 13/10/2024
+write a simple json parser `json_parser.cpp`, supporting null, number, string, array, map.
+
+`haversine_compare.cpp` use the parser to parse the generated json file and compute its reference haversine average(expect sum)
+
 ## 12/10/2024
 write a haversine json generator, implemented 2 generating mode: unifrom and cluster, in which, uniform mode generate
 haversine piars uniformally across entire x and y, whereas cluster mode generate first by choosing 64 cluster randomly

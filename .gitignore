@@ -7,3 +7,5 @@ dump.data
 .DS_Store
 part2/haversine_generator
 *.json
+part2/json_parser
+part2/haversine_compare
