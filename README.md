@@ -1,4 +1,18 @@
 My homework assignment for performance awareness programming
+## 14/10/2024
+Import a cpu cycle counter from https://github.com/lemire/Code-used-on-Daniel-Lemire-s-blog/blob/master/2023/03/21/performancecounters/apple_arm_events.h 
+
+which need to be run with root privilege
+
+write a function to estimate cpu frequency by:
+1. use the OS timer as the reference point, we know that OS timer's frequency is 1000000/second (1 nanosecond resolution)
+2. write a while loop in a short time frame (e.g. 100ms) to get how many ticks the OS timer has gone by (os_elapsed), as well as how many ticks the CPU timer has gone by (cpu_elpased)
+3. get ratio by `cpu_elapsed / os_elapsed`, this tells us how many ticks has cpu gone per OS tick. Then multiplied that with OS frequency `os_freq * cpu_elapsed/os_elapsed` yields estimated cpu frequency per second
+
+Use the estimated cpu frequency to further estimate the haversine processor:
+1. read cpu time before and after an operation (e.g. json parsing) and get the difference.
+2. calculate the elasped time in millisecond as  `1000.0 * diff/cpu_freq`
+
 ## 13/10/2024
 write a simple json parser `json_parser.cpp`, supporting null, number, string, array, map.
 
