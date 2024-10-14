@@ -9,3 +9,4 @@ part2/haversine_generator
 *.json
 part2/json_parser
 part2/haversine_compare
+part2/mac_performance_counter

@@ -1,4 +1,40 @@
 My homework assignment for performance awareness programming
+## 15/10/2024
+As the requirement of homework assignment, I need to investigate how performance counter works under Macos.
+
+The equivalence of `QueryPerformanceCounter` in windows on macos is `mach_absolute_time()`.
+
+First, I setup the routine to esitmate the counter's frequency as previously did. It shows that the frequency
+is about 24MHz. Then I prob into the `mach_absolute_time()` use debugger to see where does the value come from.
+
+The assembly sequence of `mach_absolute_time` on my m3 macbook is as follow:
+```
+movk x3, #0x0, lsl #48
+movk x3, #0xf, lsl #32
+movk x3 #0xffff, lsl #16
+movk x3, #0xc088
+ldrb w2, [x3, #0x8]
+...
+cmp x2, #0x3
+b.eq 0x18062e2c0;
+...
+//At address 2c0
+ldr x1, [x3]
+mrs x0, S3_4_C15_C10_6
+...
+add x0, x0, x1
+ret
+```
+The first several `movk`s construct a 64bit value as `0xfffffc088`. on darwin, the `0xfffffc000` is 'common page' that the darwin kernel maps it into userspace: https://github.com/apple/darwin-xnu/blob/2ff845c2e033bd0ff64b5b6aa6063a1f8f65aa32/osfmk/arm/cpu_capabilities.h#L203
+
+so the `0xfffffc088` is _COMM_PAGE_TIMEBASE_OFFSET (https://github.com/apple/darwin-xnu/blob/2ff845c2e033bd0ff64b5b6aa6063a1f8f65aa32/osfmk/arm/cpu_capabilities.h#L230)
+
+the `0xfffffc088 + 0x8` is _COMM_PAGE_USER_TIMEBASE (https://github.com/apple/darwin-xnu/blob/2ff845c2e033bd0ff64b5b6aa6063a1f8f65aa32/osfmk/arm/cpu_capabilities.h#L231)
+
+the routine then jump based on the `user_timebase`, read value from system register `S3_4_C15_C10_6`, then add an offset on it before return it as the value.
+
+seems like no special calculation happens here, just pure register read.
+
 ## 14/10/2024
 Import a cpu cycle counter from https://github.com/lemire/Code-used-on-Daniel-Lemire-s-blog/blob/master/2023/03/21/performancecounters/apple_arm_events.h 
 

@@ -5,6 +5,8 @@
 #include "json_parser.cpp"
 #include "haversine_reference.cpp"
 #include "metrics.cpp"
+
+//this file can only be executed with root privilege
  
 int main(int argc, char* argv[]) {
     u64 CPUFreq = EstimateCPUFreq();
