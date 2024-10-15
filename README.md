@@ -1,5 +1,14 @@
 My homework assignment for performance awareness programming
 ## 15/10/2024
+### Basic instrument utilities 14:48
+implement a utility that facilitate instrumentation-based profiling.
+
+based on `ReadCPUTimer` implemented previously, wirte a little RAII class which record between its construction and destruction, inside destructor, add the elpased value into a global variable.
+
+write a macro to quick profile a function
+
+
+### Understand mach_absolute_time 11:00
 As the requirement of homework assignment, I need to investigate how performance counter works under Macos.
 
 The equivalence of `QueryPerformanceCounter` in windows on macos is `mach_absolute_time()`.
