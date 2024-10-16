@@ -1,4 +1,11 @@
 My homework assignment for performance awareness programming
+## 17/10/2024
+### Modify the profiler
+I modified the profiler to align with Casy's implementation:
+
+1. use array instead of std::vector
+2. implement nested profiler use a global parent pointer
+
 ## 15/10/2024
 ### Basic instrument utilities 14:48
 implement a utility that facilitate instrumentation-based profiling.

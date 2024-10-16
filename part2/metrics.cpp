@@ -4,7 +4,7 @@
 
 //for apple sillicon
 //https://lemire.me/blog/2023/03/21/counting-cycles-and-instructions-on-arm-based-apple-systems/
-#ifdef __APPLE__ && __arm64__
+#if __APPLE__ && __arm64__
 #include "apple_arm_events.h"
 #endif
 
@@ -25,7 +25,7 @@ static u64 ReadOSTimer(void)
 }
 
 
-#ifdef __APPLE__ && __arm64__
+#if __APPLE__ && __arm64__
     AppleEvents apple;
 #endif
 /* NOTE(casey): This does not need to be "inline", it could just be "static"
@@ -37,7 +37,7 @@ inline u64 ReadCPUTimer(void)
 	// NOTE(casey): If you were on ARM, you would need to replace __rdtsc
 	// with one of their performance counter read instructions, depending
 	// on which ones are available on your platform.
-#ifdef __APPLE__ && __arm64__
+#if __APPLE__ && __arm64__
     bool setup = apple.setup_performance_counters();
     assert(setup);
     auto counter = apple.get_counters();
@@ -68,10 +68,10 @@ u64 EstimateCPUFreq() {
         CPUFreq = OSFreq * CPUElapsed / OSElapsed;
     }
 
-	printf("    OS Timer: %llu -> %llu = %llu elapsed\n", OSStart, OSEnd, OSElapsed);
-    printf(" OS Seconds: %.4f\n", (f64)OSElapsed/(f64)OSFreq);
+	// printf("    OS Timer: %llu -> %llu = %llu elapsed\n", OSStart, OSEnd, OSElapsed);
+    // printf(" OS Seconds: %.4f\n", (f64)OSElapsed/(f64)OSFreq);
 
-    printf("    CPU Timer: %llu -> %llu = %llu elapsed\n", CPUStart, CPUEnd, CPUElapsed);
-    printf(" CPU Freq: %llu (guessed)\n", CPUFreq);
+    // printf("    CPU Timer: %llu -> %llu = %llu elapsed\n", CPUStart, CPUEnd, CPUElapsed);
+    // printf(" CPU Freq: %llu (guessed)\n", CPUFreq);
 	return CPUFreq;
 }

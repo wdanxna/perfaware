@@ -38,6 +38,7 @@ JSON parse_string(const std::string& str, int& at, int e) {
 }
 
 JSON parse_array(const std::string& str, int& at, int e) {
+    TimeFunction;
     std::vector<JSON> ret;
     assert(str[at] == '[');
     assert(at < e);
@@ -86,6 +87,7 @@ JSON parse_number(const std::string& str, int& at, int e) {
 }
 
 JSON parse(const std::string& str, int& at, int e) {
+    TimeFunction;
     if (at >= e) return {nullptr};
     JSON ret {nullptr};
     if (str[at] == '[') {

@@ -2,76 +2,95 @@
 #include "common.h"
 #include <fstream>
 
-
-#include "json_parser.cpp"
-#include "haversine_reference.cpp"
 #include "metrics.cpp"
 
 //The old haversine_compare.cpp is also 'instrumented', but for disambiguous purposes, this file
 //is used to complete assignment for instrumentation utilities
 
-struct aggregate_profiler {
-    struct section {
-        std::string name;
-        u64 begin, end, elapsed;
-
-        void start() {
-            begin = ReadCPUTimer();
-        }
-        void stop() {
-            end = ReadCPUTimer();
-            elapsed = end - begin;
-        }
+struct Profiler {
+    struct Anchor {
+        const char* name;
+        u64 hit_count;
+        u64 elapsed;
+        u64 children_elapsed;
     };
 
-    std::vector<section> sections;
-    u64 total_elapsed = 0;
+    Anchor sections[4096];
     u64 cpu_freq = 0;
+    u64 begin = 0, end = 0;
 
-    aggregate_profiler() {
+    inline f64 cpu_time_ms(Anchor& sec) {
+        return 1000.0 * ((f64)sec.elapsed/(f64)cpu_freq);
+    }
+
+    void beginProfiling() {
+        begin = ReadCPUTimer();
+    }
+
+    void endProfiling() {
+        end = ReadCPUTimer();
         cpu_freq = EstimateCPUFreq();
     }
 
-    void addSection(const section& sec) {
-        total_elapsed += sec.elapsed;
-        sections.push_back(std::move(sec));
-    }
-
-    f64 total_elapsed_ms() {
-        return 1000.0 * ((f64)total_elapsed / (f64)cpu_freq);
-    }
-
-    inline f64 cpu_time_ms(section& sec) {
-        return 1000.0 * ((f64)(sec.end - sec.begin)/(f64)cpu_freq);
-    }
-
     void report() {
-        auto total = total_elapsed_ms();
-        printf("Total elapsed: %.2fms\n", total);
-        for (auto& s : sections) {
-            auto t = cpu_time_ms(s);
-            printf("    %s: %.2fms (%.2f%%)\n", s.name.c_str(), t, (t/total)*100.0);
+        if (cpu_freq) {
+            auto total_elapsed = end - begin;
+            f64 total_miliseconds = 1000.0 * (f64)total_elapsed/(f64)cpu_freq;
+            printf("Total elapsed: %.2fms\n", total_miliseconds);
+            for (int i = 0; i < ArrayCount(sections); i++) {
+                auto& sec = sections[i];
+                if (sec.elapsed) {
+                    auto t = cpu_time_ms(sec);
+                    f64 exclusive_elapsed = 1000.0 * (sec.elapsed - sec.children_elapsed)/(f64)cpu_freq;
+                    printf("    %s[%llu]: %.4fms (%.4f%%, %.4f%% w/children)\n", sec.name, sec.hit_count, t, (t/total_miliseconds)*100.0, (exclusive_elapsed/total_miliseconds)*100.0);
+                }
+            }
         }
     }
 };
 
-aggregate_profiler global_profiler;
+static Profiler profiler;
+static u64 globalParent;
 
 struct scope_timer {
-    aggregate_profiler::section sec{};
-    scope_timer(const char* name) {
-        sec.name = name;
-        sec.start();
+    u64 id;
+    const char* name;
+    u64 begin;
+    u64 parent;
+    scope_timer(const char* name, u64 index) {
+        this->name = name;
+        this->id = index;
+        begin = ReadCPUTimer();
+        parent = globalParent;
+        globalParent = index;
     }
     ~scope_timer() {
-        sec.stop();
-        global_profiler.addSection(std::move(sec));
+        u64 elapsed = ReadCPUTimer() - begin;
+        auto& sec = profiler.sections[id];
+        sec.elapsed = elapsed;
+        sec.hit_count++;
+        sec.name = name;
+
+        //accumulate to parent
+        if (parent != 0) {
+            //0 is reserved
+            auto& p = profiler.sections[parent];
+            p.children_elapsed += elapsed;
+        }
+        globalParent = parent;
     }
 };
 
 
-#define TimeFunction \
-    scope_timer profiler_scoper(__FUNCTION__);
+
+#define NameConcat2(A, B) A##B
+#define NameConcat(A, B) NameConcat2(A, B)
+#define TimeBlock(Name) \
+    scope_timer NameConcat(BLOCK, __LINE__)(Name, __COUNTER__+1);
+#define TimeFunction TimeBlock(__FUNCTION__)
+
+#include "json_parser.cpp"
+#include "haversine_reference.cpp"
 
 std::string read_file(const char* filename) {
     TimeFunction
@@ -92,17 +111,18 @@ std::string read_file(const char* filename) {
     return std::string(buffer, read);
 }
 
-JSON parse_json(const std::string& json) {
+void parse_haversine_pairs(const std::string& str, std::vector<f64>& haversines, f64& average) {
     TimeFunction;
-    int at = 0;
-    return parse(json, at, json.size()-1);
-}
 
-void compute(JSON::Array& pairs, std::vector<f64>& haversines, f64& average) {
-    TimeFunction;
+    int at = 0;
+    auto json = parse(str, at, str.size()-1);
+
     f64 sum = 0.0;
     {
-        scope_timer timer("haversine loop");
+        TimeBlock("lookup and convert");
+        auto& map = std::get<JSON::Map>(json);
+        assert(map.find("pairs") != map.end());
+        auto& pairs = std::get<JSON::Array>(map["pairs"]);
         for (auto& pair : pairs) {
             auto& m = std::get<JSON::Map>(pair);
             auto x0 = std::get<JSON::Number>(m["X0"]);
@@ -113,26 +133,27 @@ void compute(JSON::Array& pairs, std::vector<f64>& haversines, f64& average) {
             sum += hav;
             haversines.push_back(hav);
         }
+        average = sum / pairs.size();
     }
-    average = sum / pairs.size();
 }
 
 int main(int argc, char* argv[]) {
 
+    profiler.beginProfiling();
+
     auto json_str = read_file("data_100000_cluster.json");
     
-    auto json = parse_json(json_str);
-    auto& map = std::get<JSON::Map>(json);
-    assert(map.find("pairs") != map.end());
-    auto& pairs = std::get<JSON::Array>(map["pairs"]);
-
     std::vector<f64> haversines;
     f64 average;
-    compute(pairs, haversines, average);
+    parse_haversine_pairs(json_str, haversines, average);
 
-    std::cout << "Pair count: " << pairs.size() << "\n";
+
+    std::cout << "Pair count: " << haversines.size() << "\n";
     std::cout << "Expected sum: " << average << "\n";
 
-    global_profiler.report();
+    profiler.endProfiling();
+    profiler.report();
     return 0;
 }
+
+static_assert(__COUNTER__-1 < ArrayCount(profiler.sections));
