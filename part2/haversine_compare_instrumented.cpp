@@ -11,10 +11,8 @@ struct Profiler {
     struct Anchor {
         const char* name;
         u64 hit_count;
-        u64 elapsed;
-        u64 real_elapsed;
-        u64 children_elapsed;
-        u64 depth;
+        u64 elapsed_inclusive;//containing all children's cost
+        u64 elapsed_exclusive;//excluded all children's cost
     };
 
     Anchor sections[4096];
@@ -41,10 +39,10 @@ struct Profiler {
             printf("Total elapsed: %.2fms\n", total_miliseconds);
             for (int i = 0; i < ArrayCount(sections); i++) {
                 auto& sec = sections[i];
-                if (sec.elapsed) {
-                    auto t = cpu_time_ms(sec.real_elapsed);
-                    f64 exclusive_elapsed = cpu_time_ms(sec.elapsed - sec.children_elapsed);
-                    printf("    %s[%llu]: %.4fms (%.4f%%, %.4f%% w/children)\n", sec.name, sec.hit_count, t, (t/total_miliseconds)*100.0, (exclusive_elapsed/total_miliseconds)*100.0);
+                if (sec.elapsed_exclusive) {
+                    auto ti = cpu_time_ms(sec.elapsed_inclusive);
+                    auto te = cpu_time_ms(sec.elapsed_exclusive);
+                    printf("    %s[%llu]: %.4fms (%.4f%% exclusive, %.4f%% inclusive)\n", sec.name, sec.hit_count, te, (te/total_miliseconds)*100.0, (ti/total_miliseconds)*100.0);
                 }
             }
         }
@@ -59,6 +57,7 @@ struct scope_timer {
     const char* name;
     u64 begin;
     u64 parent;
+    u64 old_elapsed_inclusive;
     scope_timer(const char* name, u64 index) {
         this->name = name;
         this->id = index;
@@ -67,26 +66,23 @@ struct scope_timer {
         globalParent = index;
 
         auto& sec = profiler.sections[id];
-        sec.depth++;
+        old_elapsed_inclusive = sec.elapsed_inclusive;
     }
     ~scope_timer() {
         u64 elapsed = ReadCPUTimer() - begin;
         auto& sec = profiler.sections[id];
-        sec.depth--;
         sec.hit_count++;
-        assert(sec.depth >= 0);
-        if (sec.depth == 0) {
-            //top level call
-            sec.real_elapsed += elapsed;
-            sec.name = name;
-        }
-        sec.elapsed += elapsed;
+        //outmost call will overwrite all recursive calls' value, thus achieve the same effect of a nested counter
+        //without a write to anchor object everytime the block opens.
+        sec.elapsed_inclusive = old_elapsed_inclusive + elapsed;
+        sec.elapsed_exclusive += elapsed;
+        sec.name = name;
 
         //accumulate to parent
         if (parent != 0) {
             //0 is reserved
             auto& p = profiler.sections[parent];
-            p.children_elapsed += elapsed;
+            p.elapsed_exclusive -= elapsed;
         }
         globalParent = parent;
     }

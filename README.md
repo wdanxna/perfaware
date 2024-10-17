@@ -1,5 +1,6 @@
 My homework assignment for performance awareness programming
 ## 18/10/2024
+
 ### recursive profiler
 current profiler cannot deal with recursion:
 ![alt text](part2/recursion.jpeg "recursion")
@@ -18,6 +19,24 @@ use the `children_elapsed` variable to accumulate all elapsed time of children a
 calculate the cost of foo without children: `elapsed - children_elapsed = a + d - b = a - c`
 
 use the `real_elpased` to represent the total elapsed of foo (instead of `elapsed` as before)
+
+### Improvement 
+Instead of using a nested counter `depth` to tell if it's the outmost function, we use a `elapsed_inclusive` counter to represent the outmost function's cost. Whenever a `scoped_timer` opens, its value is read and stored (in `scoped_timer` object), and when the block ends, put the stored value **plus** the elapsed time and write it back to the anchor, thus the outmost function will always overwrite whatever value its recursive self has written and we save a write operation everytime we open a scope timer.
+
+Since we use new variable `elapsed_inclusive` to track the total elapsed time a function cost, the only purpose of variable `elpased` and `children_elapsed` is to calculate **exclusive** cost of the function(because under the recursion, `elapsed` won't represent true cost of a function). We could collapse these 2 variables into 1 variable `elapsed_exclusive`, which accumulated on its own anchor but substract from its parent's whenever the block ends.
+
+### The interpretation of the report
+```
+Total elapsed: 2739.46ms
+    parse_array[1]: 350.0628ms (12.7785% exclusive, 81.9342% inclusive)
+    parse_dict[100033]: 1187.8129ms (43.3594% exclusive, 96.0583% inclusive)
+    parse_number[400128]: 302.5226ms (11.0432% exclusive, 11.0432% inclusive)
+    parse[500162]: 791.0906ms (28.8776% exclusive, 96.0587% inclusive)
+    read_file[1]: 1.6470ms (0.0601% exclusive, 0.0601% inclusive)
+    parse_haversine_pairs[1]: 46.5730ms (1.7001% exclusive, 99.9390% inclusive)
+    lookup and convert[1]: 59.7245ms (2.1802% exclusive, 2.1802% inclusive)
+```
+It reads as `<function name>[<hit count>]: <exclusive time in ms> (<exclusive ratio> exclusive, <inclusive ratio> inclusive)`
 
 
 ## 17/10/2024
