@@ -12,15 +12,17 @@ struct Profiler {
         const char* name;
         u64 hit_count;
         u64 elapsed;
+        u64 real_elapsed;
         u64 children_elapsed;
+        u64 depth;
     };
 
     Anchor sections[4096];
     u64 cpu_freq = 0;
     u64 begin = 0, end = 0;
 
-    inline f64 cpu_time_ms(Anchor& sec) {
-        return 1000.0 * ((f64)sec.elapsed/(f64)cpu_freq);
+    inline f64 cpu_time_ms(u64 time) {
+        return 1000.0 * ((f64)time/(f64)cpu_freq);
     }
 
     void beginProfiling() {
@@ -40,8 +42,8 @@ struct Profiler {
             for (int i = 0; i < ArrayCount(sections); i++) {
                 auto& sec = sections[i];
                 if (sec.elapsed) {
-                    auto t = cpu_time_ms(sec);
-                    f64 exclusive_elapsed = 1000.0 * (sec.elapsed - sec.children_elapsed)/(f64)cpu_freq;
+                    auto t = cpu_time_ms(sec.real_elapsed);
+                    f64 exclusive_elapsed = cpu_time_ms(sec.elapsed - sec.children_elapsed);
                     printf("    %s[%llu]: %.4fms (%.4f%%, %.4f%% w/children)\n", sec.name, sec.hit_count, t, (t/total_miliseconds)*100.0, (exclusive_elapsed/total_miliseconds)*100.0);
                 }
             }
@@ -63,13 +65,22 @@ struct scope_timer {
         begin = ReadCPUTimer();
         parent = globalParent;
         globalParent = index;
+
+        auto& sec = profiler.sections[id];
+        sec.depth++;
     }
     ~scope_timer() {
         u64 elapsed = ReadCPUTimer() - begin;
         auto& sec = profiler.sections[id];
-        sec.elapsed = elapsed;
+        sec.depth--;
         sec.hit_count++;
-        sec.name = name;
+        assert(sec.depth >= 0);
+        if (sec.depth == 0) {
+            //top level call
+            sec.real_elapsed += elapsed;
+            sec.name = name;
+        }
+        sec.elapsed += elapsed;
 
         //accumulate to parent
         if (parent != 0) {

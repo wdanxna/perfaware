@@ -1,4 +1,25 @@
 My homework assignment for performance awareness programming
+## 18/10/2024
+### recursive profiler
+current profiler cannot deal with recursion:
+![alt text](part2/recursion.jpeg "recursion")
+we can't simply calculate the `cost of foo without children` by `a-b` since it doesn't account for the `d`, hence will not reflect the real `cost of foo without children`. Instead we should do `a - b + d` or `a - c`.
+
+setup a counter `depth` to keep track of how many times current function has been entered before it returns, if depth > 0, it means the function is called recursively.
+
+setup a `real_elapsed` variable to track the elapsed time only when the top-level function returns (when depth == 0), ignoring any recursive cost of itself, since the top-level cost will cover them all.
+
+use the `elapsed` variable to accumulate all elapsed time as before.
+`elapsed = a + d`
+
+use the `children_elapsed` variable to accumulate all elapsed time of children as before.
+`children_elapsed = b`
+
+calculate the cost of foo without children: `elapsed - children_elapsed = a + d - b = a - c`
+
+use the `real_elpased` to represent the total elapsed of foo (instead of `elapsed` as before)
+
+
 ## 17/10/2024
 ### Modify the profiler
 I modified the profiler to align with Casy's implementation:
@@ -99,7 +120,7 @@ simulating memory access without considering segment registers and 8bits registe
 
 Successfully running LISTING 54 a "real" program, creating a 64x64x4 image, dumping the raw image into a file and check with GIMP
 
-![alt text](dump.jpg "Title")
+![alt text](part1/dump.jpg "Title")
 
 ## 9/10/2024
 I decided to use Casys's Sim86 as basis for future assignments since its data structure is better designed and I want to study its code and design style. I imported its Sim86 as library into my homework workspace, write a main.cpp for assignment 4 which is simulating `MOV reg, imm` and `MOV reg, reg` instructions.
