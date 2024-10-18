@@ -38,7 +38,7 @@ JSON parse_string(const std::string& str, int& at, int e) {
 }
 
 JSON parse_array(const std::string& str, int& at, int e) {
-    TimeFunction;
+    // TimeFunction;
     std::vector<JSON> ret;
     assert(str[at] == '[');
     assert(at < e);
@@ -55,7 +55,7 @@ JSON parse_array(const std::string& str, int& at, int e) {
 }
 
 JSON parse_dict(const std::string& str, int& at, int e) {
-    TimeFunction;
+    // TimeFunction;
     std::unordered_map<std::string, JSON> ret;
     assert(str[at] == '{');
     assert(at < e);
@@ -78,7 +78,7 @@ JSON parse_dict(const std::string& str, int& at, int e) {
 }
 
 JSON parse_number(const std::string& str, int& at, int e) {
-    TimeFunction;
+    // TimeFunction;
     assert(at <= e);
     assert(str[at] == '.' || str[at] == '-' || (str[at] >= '0' && str[at] <= '9'));
     const char* cstr = str.c_str();
@@ -89,7 +89,7 @@ JSON parse_number(const std::string& str, int& at, int e) {
 }
 
 JSON parse(const std::string& str, int& at, int e) {
-    TimeFunction;
+    // TimeFunction;
     if (at >= e) return {nullptr};
     JSON ret {nullptr};
     if (str[at] == '[') {
@@ -111,6 +111,7 @@ JSON parse(const std::string& str, int& at, int e) {
 }
 
 JSON parseJSON(const std::string& str) {
+    TimeFunction;
     if (str.size() == 0) return {nullptr};
     int at = 0;
     return parse(str, at, str.size()-1);

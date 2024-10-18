@@ -6,6 +6,9 @@
 
 //The old haversine_compare.cpp is also 'instrumented', but for disambiguous purposes, this file
 //is used to complete assignment for instrumentation utilities
+#ifndef PROFILER
+#define PROFILER 1
+#endif
 
 struct Profiler {
     struct Anchor {
@@ -48,8 +51,10 @@ struct Profiler {
         }
     }
 };
-
 static Profiler profiler;
+
+#if PROFILER
+
 static u64 globalParent;
 
 struct scope_timer {
@@ -88,19 +93,23 @@ struct scope_timer {
     }
 };
 
-
-
 #define NameConcat2(A, B) A##B
 #define NameConcat(A, B) NameConcat2(A, B)
 #define TimeBlock(Name) \
     scope_timer NameConcat(BLOCK, __LINE__)(Name, __COUNTER__+1);
 #define TimeFunction TimeBlock(__FUNCTION__)
+#define ProfilerValidation static_assert(__COUNTER__-1 < ArrayCount(profiler.sections));
+#else
+#define TimeBlock(...)
+#define TimeFunction
+#define ProfilerValidation
+#endif
 
 #include "json_parser.cpp"
 #include "haversine_reference.cpp"
 
 std::string read_file(const char* filename) {
-    TimeFunction
+    TimeFunction;
 
     u32 read = 0;
     char* buffer = new char[20*1024*1024];
@@ -122,7 +131,7 @@ void parse_haversine_pairs(const std::string& str, std::vector<f64>& haversines,
     TimeFunction;
 
     int at = 0;
-    auto json = parse(str, at, str.size()-1);
+    auto json = parseJSON(str);
 
     f64 sum = 0.0;
     {
@@ -163,4 +172,4 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-static_assert(__COUNTER__-1 < ArrayCount(profiler.sections));
+ProfilerValidation

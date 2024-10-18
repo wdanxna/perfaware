@@ -38,6 +38,11 @@ Total elapsed: 2739.46ms
 ```
 It reads as `<function name>[<hit count>]: <exclusive time in ms> (<exclusive ratio> exclusive, <inclusive ratio> inclusive)`
 
+### Add kill switch
+Add a kill switch to easily turn on and off the profiler, this allows us to do AB test to see how much overhead the profiler markups incurred. Find a sweetspot between granularity of profiling information and overhead.
+
+Basically, do not put markups on those recursive function that get million calls.
+
 
 ## 17/10/2024
 ### Modify the profiler
