@@ -1,4 +1,12 @@
 My homework assignment for performance awareness programming
+## 19/10/2024
+### Calculate data throughput
+Add data throughput support for profiler
+
+`throughput = data_size / elapsed_time`
+
+By adding another parameter to `TimeBlock` that specify data size, store `bytes` in the anchor object. when calculate the throughput at report stage, get inclusive elapsed time in seconds by `seconds = inclusive_elpased / cpu_freq`, calcuate throughput in GB/s by `throughput = (bytes/Gigabytes)/seconds`.
+
 ## 18/10/2024
 
 ### recursive profiler

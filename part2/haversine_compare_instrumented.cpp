@@ -16,6 +16,7 @@ struct Profiler {
         u64 hit_count;
         u64 elapsed_inclusive;//containing all children's cost
         u64 elapsed_exclusive;//excluded all children's cost
+        u64 bytes;//how many bytes does this block process
     };
 
     Anchor sections[4096];
@@ -39,14 +40,33 @@ struct Profiler {
         if (cpu_freq) {
             auto total_elapsed = end - begin;
             f64 total_miliseconds = 1000.0 * (f64)total_elapsed/(f64)cpu_freq;
-            printf("Total elapsed: %.2fms\n", total_miliseconds);
-            for (int i = 0; i < ArrayCount(sections); i++) {
+            printf("Total elapsed: %.2fms (%llu)\n", total_miliseconds, cpu_freq);
+            for (int i = 1; i < ArrayCount(sections); i++) {
                 auto& sec = sections[i];
                 if (sec.elapsed_exclusive) {
+                    //calculate data throughput
+                    constexpr u64 Megabytes = 1024*1024;
+                    constexpr u64 Gigabytes = 1024*Megabytes;
+                    auto seconds = (f64)sec.elapsed_inclusive / cpu_freq;
+                    auto amountMb = (f64)sec.bytes / Megabytes;//how many MB is processed in total
+                    auto throughput = ((f64)sec.bytes / Gigabytes) / seconds; //how many GB is processed per second
+
                     auto ti = cpu_time_ms(sec.elapsed_inclusive);
                     auto te = cpu_time_ms(sec.elapsed_exclusive);
-                    printf("    %s[%llu]: %.4fms (%.4f%% exclusive, %.4f%% inclusive)\n", sec.name, sec.hit_count, te, (te/total_miliseconds)*100.0, (ti/total_miliseconds)*100.0);
+                    printf("    %s[%llu]: %.4fms", sec.name, sec.hit_count, te);
+                    if (sec.elapsed_exclusive != sec.elapsed_inclusive) {
+                        printf("(%.2f%%, %.2f%% inc)", 
+                            (te/total_miliseconds)*100.0, 
+                            (ti/total_miliseconds)*100.0);
+                    } else {
+                        printf("(%.2f%%)", (te/total_miliseconds)*100.0);
+                    }
+                    if (sec.bytes) {
+                        printf(",(%.2fMB, %.4fGB/s)", amountMb, throughput);
+                    }
+                    printf("\n");
                 }
+                else break;
             }
         }
     }
@@ -63,9 +83,11 @@ struct scope_timer {
     u64 begin;
     u64 parent;
     u64 old_elapsed_inclusive;
-    scope_timer(const char* name, u64 index) {
+    u64 bytes;
+    scope_timer(const char* name, u64 bytes, u64 index) {
         this->name = name;
         this->id = index;
+        this->bytes = bytes;
         begin = ReadCPUTimer();
         parent = globalParent;
         globalParent = index;
@@ -81,6 +103,7 @@ struct scope_timer {
         //without a write to anchor object everytime the block opens.
         sec.elapsed_inclusive = old_elapsed_inclusive + elapsed;
         sec.elapsed_exclusive += elapsed;
+        sec.bytes += bytes;
         sec.name = name;
 
         //accumulate to parent
@@ -95,9 +118,9 @@ struct scope_timer {
 
 #define NameConcat2(A, B) A##B
 #define NameConcat(A, B) NameConcat2(A, B)
-#define TimeBlock(Name) \
-    scope_timer NameConcat(BLOCK, __LINE__)(Name, __COUNTER__+1);
-#define TimeFunction TimeBlock(__FUNCTION__)
+#define TimeBlock(Name, Bytes) \
+    scope_timer NameConcat(BLOCK, __LINE__)(Name, Bytes, __COUNTER__+1);
+#define TimeFunction TimeBlock(__FUNCTION__, 0)
 #define ProfilerValidation static_assert(__COUNTER__-1 < ArrayCount(profiler.sections));
 #else
 #define TimeBlock(...)
@@ -116,6 +139,7 @@ std::string read_file(const char* filename) {
     FILE *File = fopen(filename, "r");
     if (File)
     {
+        TimeBlock("fread", 5358880);
         read = fread(buffer, 1, 20*1024*1024, File);
         fclose(File);
     }
@@ -135,10 +159,10 @@ void parse_haversine_pairs(const std::string& str, std::vector<f64>& haversines,
 
     f64 sum = 0.0;
     {
-        TimeBlock("lookup and convert");
         auto& map = std::get<JSON::Map>(json);
         assert(map.find("pairs") != map.end());
         auto& pairs = std::get<JSON::Array>(map["pairs"]);
+        TimeBlock("compute", pairs.size() * sizeof(haversine_pair));
         for (auto& pair : pairs) {
             auto& m = std::get<JSON::Map>(pair);
             auto x0 = std::get<JSON::Number>(m["X0"]);

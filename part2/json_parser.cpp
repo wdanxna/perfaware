@@ -111,7 +111,7 @@ JSON parse(const std::string& str, int& at, int e) {
 }
 
 JSON parseJSON(const std::string& str) {
-    TimeFunction;
+    TimeBlock(__FUNCTION__, str.size());
     if (str.size() == 0) return {nullptr};
     int at = 0;
     return parse(str, at, str.size()-1);

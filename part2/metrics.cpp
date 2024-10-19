@@ -39,7 +39,10 @@ inline u64 ReadCPUTimer(void)
 	// on which ones are available on your platform.
 #if __APPLE__ && __arm64__
     bool setup = apple.setup_performance_counters();
-    assert(setup);
+    // assert(setup);
+    if (!setup) {
+        return mach_absolute_time();
+    }
     auto counter = apple.get_counters();
     return counter.cycles;
 #elif
