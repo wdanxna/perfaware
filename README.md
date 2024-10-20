@@ -1,4 +1,8 @@
 My homework assignment for performance awareness programming
+## 20/10/2024
+### Repetition test
+setup the repetition test framework
+
 ## 19/10/2024
 ### Calculate data throughput
 Add data throughput support for profiler
