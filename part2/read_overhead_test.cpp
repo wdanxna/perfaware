@@ -142,6 +142,8 @@ int main(int argc, char** argv) {
         Params.Dest = AllocateBuffer(Stat.st_size);
         Params.Filename = FileName;
 
+        printf("CPU Freq: %llu, FileSize: %llu\n", CPUTimerFreq, Stat.st_size);
+
         if (Params.Dest.Count > 0) {
             repetition_tester Testers[ArrayCount(TestFunctions)] = {};
 

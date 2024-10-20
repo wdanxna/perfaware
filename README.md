@@ -1,7 +1,110 @@
 My homework assignment for performance awareness programming
 ## 20/10/2024
 ### Repetition test
-setup the repetition test framework
+setup the repetition test framework, test on 3 read file functions(`fread`, `CFReadStream` and `read`) to see their bandwidth. The results is as following:
+
+```
+CPU Freq: 4012858420, FileSize: 5358880
+--- ReadFile ---
+Max: 2581026 (0.643189ms) 7.759534GB/s            
+Min: 2581026 (0.643189ms) 7.759534GB/s            
+Min: 803926 (0.200337ms) 24.912191GB/s            
+Min: 552354 (0.137646ms) 36.258555GB/s            
+Min: 543390 (0.135412ms) 36.856692GB/s          
+Min: 456210 (0.113687ms) 43.899866GB/s            
+
+Min: 456210 (0.113687ms) 43.899866GB/s
+Max: 2581026 (0.643189ms) 7.759534GB/s
+Avg: 480861 (0.119830ms) 41.649389GB/s
+
+--- fread ---
+Max: 527215 (0.131381ms) 37.987459GB/s            
+Min: 527215 (0.131381ms) 37.987459GB/s            
+Max: 578704 (0.144212ms) 34.607603GB/s            
+Min: 524258 (0.130645ms) 38.201721GB/s            
+Min: 502697 (0.125272ms) 39.840218GB/s            
+Min: 499248 (0.124412ms) 40.115450GB/s            
+Min: 496688 (0.123774ms) 40.322210GB/s            
+Min: 487423 (0.121465ms) 41.088660GB/s            
+Min: 473583 (0.118016ms) 42.289436GB/s            
+Min: 471485 (0.117494ms) 42.477614GB/s            
+Min: 468871 (0.116842ms) 42.714431GB/s            
+Max: 606575 (0.151158ms) 33.017447GB/s            
+Max: 620414 (0.154607ms) 32.280958GB/s            
+Max: 991510 (0.247083ms) 20.199048GB/s            
+Max: 1133022 (0.282348ms) 17.676231GB/s            
+Max: 1450576 (0.361482ms) 13.806624GB/s            
+Max: 1903586 (0.474372ms) 10.520963GB/s            
+Min: 461224 (0.114937ms) 43.422628GB/s            
+Min: 461164 (0.114922ms) 43.428277GB/s            
+Min: 460837 (0.114840ms) 43.459093GB/s            
+Min: 460622 (0.114787ms) 43.479378GB/s            
+Min: 460480 (0.114751ms) 43.492786GB/s            
+Min: 460166 (0.114673ms) 43.522464GB/s            
+Min: 459389 (0.114479ms) 43.596077GB/s            
+Min: 458917 (0.114362ms) 43.640916GB/s            
+Min: 458014 (0.114137ms) 43.726956GB/s            
+Min: 457806 (0.114085ms) 43.746823GB/s            
+Min: 457582 (0.114029ms) 43.768238GB/s            
+Min: 457198 (0.113933ms) 43.804999GB/s            
+Min: 457048 (0.113896ms) 43.819376GB/s            
+Max: 1996930 (0.497633ms) 10.029174GB/s            
+Min: 456464 (0.113750ms) 43.875438GB/s            
+Min: 455900 (0.113610ms) 43.929717GB/s            
+Min: 455335 (0.113469ms) 43.984227GB/s            
+Min: 454798 (0.113335ms) 44.036161GB/s            
+Max: 2240814 (0.558408ms) 8.937626GB/s            
+
+Min: 454798 (0.113335ms) 44.036161GB/s
+Max: 2240814 (0.558408ms) 8.937626GB/s
+Avg: 475358 (0.118459ms) 42.131515GB/s
+
+--- read ---
+Max: 491694 (0.122530ms) 40.731752GB/s            
+Min: 491694 (0.122530ms) 40.731752GB/s            
+Min: 478903 (0.119342ms) 41.819655GB/s            
+Min: 471348 (0.117459ms) 42.489961GB/s            
+Max: 512545 (0.127726ms) 39.074731GB/s            
+Max: 524453 (0.130693ms) 38.187517GB/s            
+Max: 541325 (0.134898ms) 36.997290GB/s            
+Min: 466698 (0.116301ms) 42.913315GB/s            
+Min: 466270 (0.116194ms) 42.952706GB/s            
+Min: 461590 (0.115028ms) 43.388197GB/s            
+Max: 576885 (0.143759ms) 34.716725GB/s            
+Max: 606050 (0.151027ms) 33.046049GB/s            
+Max: 746412 (0.186005ms) 26.831774GB/s            
+Max: 748996 (0.186649ms) 26.739206GB/s            
+Max: 969945 (0.241709ms) 20.648138GB/s            
+Max: 988144 (0.246244ms) 20.267854GB/s            
+Max: 1099593 (0.274017ms) 18.213610GB/s            
+Max: 1316212 (0.327999ms) 15.216058GB/s            
+Min: 461002 (0.114881ms) 43.443538GB/s            
+Min: 460657 (0.114795ms) 43.476075GB/s            
+Min: 459605 (0.114533ms) 43.575588GB/s            
+Min: 458638 (0.114292ms) 43.667463GB/s            
+Min: 456804 (0.113835ms) 43.842782GB/s            
+Min: 456067 (0.113651ms) 43.913631GB/s            
+Min: 455558 (0.113525ms) 43.962696GB/s            
+Min: 454434 (0.113244ms) 44.071434GB/s            
+Min: 453934 (0.113120ms) 44.119978GB/s            
+Min: 453202 (0.112937ms) 44.191239GB/s            
+Max: 1404584 (0.350021ms) 14.258712GB/s            
+Max: 1516538 (0.377920ms) 13.206104GB/s            
+Max: 1668470 (0.415781ms) 12.003547GB/s            
+Max: 2113679 (0.526727ms) 9.475213GB/s            
+Max: 2431256 (0.605866ms) 8.237536GB/s            
+Min: 452451 (0.112750ms) 44.264590GB/s            
+Min: 451934 (0.112621ms) 44.315228GB/s            
+
+Min: 451934 (0.112621ms) 44.315228GB/s
+Max: 2431256 (0.605866ms) 8.237536GB/s
+Avg: 468726 (0.116806ms) 42.727628GB/s
+```
+
+Observations: 
+- Whoever executed first has the slowest bandwidth recorded (~ 7GB/s)
+- Subsequent reads (no matter which function as long as it's not the first) can reach around 44GB/s peak
+- After few reads, the bandwidth will regress to ~ 7GB/s before jumping back to 44GB/s
 
 ## 19/10/2024
 ### Calculate data throughput
