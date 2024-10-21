@@ -10,10 +10,58 @@
 #include "repetition_tester.cpp"
 #include "buffer.cpp"
 
+//add this to test between different allocation type
+enum AllocTypes :u32 {
+    AllocTypeNone = 0,
+    AllocTypeMalloc,//malloc & free every file read
+    AllocTypeCount
+};
+
 struct read_parameters {
     buffer Dest;
     const char *Filename;
+    AllocTypes Alloc;
 };
+
+static const char *AllocationDescription(AllocTypes Type) {
+    switch (Type)
+    {
+    case AllocTypeNone:
+        return "None";
+    case AllocTypeMalloc:
+        return "Malloc";
+    default:
+        return "Unknown";
+    }
+}
+
+static void HandleAllocation(read_parameters* Param, buffer* Buffer) {
+    switch (Param->Alloc)
+    {
+    case AllocTypeNone:
+        break;
+    case AllocTypeMalloc:
+        *Buffer = AllocateBuffer(Param->Dest.Count);
+        break;
+    default:
+        printf("Allocation: Unrecognized allocation type");
+        break;
+    }
+}
+
+static void HandleDeallocation(read_parameters* Params, buffer* Buffer) {
+    switch (Params->Alloc)
+    {
+    case AllocTypeNone:
+        break;
+    case AllocTypeMalloc:
+        FreeBuffer(Buffer);
+        break;
+    default:
+        printf("Deallocation: Unrecognized allocation type");
+        break;
+    }
+}
 
 using read_overhead_test_func = void (repetition_tester*, read_parameters*);
 
@@ -26,7 +74,8 @@ static void ReadViaFRead(repetition_tester *Tester, read_parameters *Params) {
     while (IsTesting(Tester)) {
         FILE *File = fopen(Params->Filename, "rb");
         if (File) {
-            buffer DestBuffer = Params->Dest;
+            buffer DestBuffer = Params->Dest;//copied
+            HandleAllocation(Params, &DestBuffer);
 
             BeginTime(Tester);
             size_t Result = fread(DestBuffer.Data, DestBuffer.Count, 1, File);
@@ -39,6 +88,7 @@ static void ReadViaFRead(repetition_tester *Tester, read_parameters *Params) {
             }
 
             fclose(File);
+            HandleDeallocation(Params, &DestBuffer);
         }
         else {
             Error(Tester, "fopen failed");
@@ -47,10 +97,11 @@ static void ReadViaFRead(repetition_tester *Tester, read_parameters *Params) {
 }
 
 static void ReadViaRead(repetition_tester *Tester, read_parameters *Params) {
-    while (IsTesting(Tester)) {
+    while (IsTesting(Tester)) { 
         int File = open(Params->Filename, O_RDONLY);
         if (File != -1) {
             buffer DestBuffer = Params->Dest;
+            HandleAllocation(Params, &DestBuffer);
 
             u8 *Dest = DestBuffer.Data;
             u64 SizeRemaining = DestBuffer.Count;
@@ -76,6 +127,7 @@ static void ReadViaRead(repetition_tester *Tester, read_parameters *Params) {
             }
 
             close(File);
+            HandleDeallocation(Params, &DestBuffer);
         }
         else {
             Error(Tester, "_open failed");
@@ -91,6 +143,8 @@ static void ReadViaCFReadStream(repetition_tester *Tester, read_parameters *Para
         CFReadStreamRef ReadStream = CFReadStreamCreateWithFile(kCFAllocatorDefault, FileURL);
         if (CFReadStreamOpen(ReadStream)) {
             buffer DestBuffer = Params->Dest;
+            HandleAllocation(Params, &DestBuffer);
+
             u64 SizeRemaining = DestBuffer.Count;
             while (SizeRemaining) {
                 int ReadSize = INT_MAX;
@@ -107,17 +161,18 @@ static void ReadViaCFReadStream(repetition_tester *Tester, read_parameters *Para
                     Error(Tester, "CFReadStreamRead failed");
                     break;
                 }
-
-                CFReadStreamClose(ReadStream);
-                CFRelease(ReadStream);
-                CFRelease(FileURL);
-
                 SizeRemaining -= ReadSize;
             }
+
+            CFReadStreamClose(ReadStream);
+            HandleDeallocation(Params, &DestBuffer);
         }
         else {
             Error(Tester, "CFReadStreamOpen failed");
         }
+        CFRelease(ReadStream);
+        CFRelease(FileURL);
+        CFRelease(FilePath);
     }
 }
 
@@ -126,8 +181,6 @@ test_function TestFunctions[] = {
     {"fread", ReadViaFRead},
     {"read", ReadViaRead}
 };
-
-
 
 int main(int argc, char** argv) {
 
@@ -145,15 +198,20 @@ int main(int argc, char** argv) {
         printf("CPU Freq: %llu, FileSize: %llu\n", CPUTimerFreq, Stat.st_size);
 
         if (Params.Dest.Count > 0) {
-            repetition_tester Testers[ArrayCount(TestFunctions)] = {};
+            repetition_tester Testers[ArrayCount(TestFunctions)][AllocTypeCount] = {};
 
             for (;;) {
                 for (u32 FuncIndex = 0; FuncIndex < ArrayCount(TestFunctions); ++FuncIndex) {
-                    repetition_tester *Tester = Testers + FuncIndex;
-                    test_function TestFunc = TestFunctions[FuncIndex];
-                    printf("\n--- %s ---\n", TestFunc.Name);
-                    NewTestWave(Tester, Params.Dest.Count, CPUTimerFreq);
-                    TestFunc.Func(Tester, &Params);
+
+                    for (u32 AllocIndex = 0; AllocIndex < AllocTypeCount; ++AllocIndex) {
+                        Params.Alloc = (AllocTypes)AllocIndex;
+
+                        repetition_tester *Tester = &Testers[FuncIndex][AllocIndex];
+                        test_function TestFunc = TestFunctions[FuncIndex];
+                        printf("\n--- %s %s---\n", TestFunc.Name, AllocationDescription(Params.Alloc));
+                        NewTestWave(Tester, Params.Dest.Count, CPUTimerFreq);
+                        TestFunc.Func(Tester, &Params);
+                    }
                 }
             }
         }

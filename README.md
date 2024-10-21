@@ -1,4 +1,70 @@
 My homework assignment for performance awareness programming
+## 21/10/2024
+### Comparison with malloc every read
+```
+CPU Freq: 3994346450, FileSize: 5358880
+
+--- ReadFile None---
+
+Min: 460783 (0.115359ms) 43.263679GB/s
+Max: 2463193 (0.616670ms) 8.093222GB/s
+Avg: 485933 (0.121655ms) 41.024560GB/s
+
+--- ReadFile Malloc---
+
+Min: 873122 (0.218589ms) 22.832053GB/s
+Max: 2755694 (0.689899ms) 7.234173GB/s
+Avg: 957680 (0.239759ms) 20.816112GB/s
+
+--- fread None---
+
+Min: 461705 (0.115590ms) 43.177283GB/s
+Max: 2099275 (0.525562ms) 9.496215GB/s
+Avg: 483015 (0.120925ms) 41.272364GB/s
+
+--- fread Malloc---
+
+Min: 868274 (0.217376ms) 22.959535GB/s
+Max: 2781749 (0.696422ms) 7.166415GB/s
+Avg: 948239 (0.237395ms) 21.023353GB/s
+
+--- read None---
+
+Min: 459154 (0.114951ms) 43.417171GB/s
+Max: 2102738 (0.526429ms) 9.480576GB/s
+Avg: 486696 (0.121846ms) 40.960170GB/s
+
+--- read Malloc---
+
+Min: 865021 (0.216561ms) 23.045877GB/s
+Max: 4056316 (1.015514ms) 4.914599GB/s
+Avg: 970002 (0.242844ms) 20.551667GB/s
+```
+
+Surround read file by malloc and free effectively reduce the bandwidth by half
+
+### Instruments cannot trace
+![alt text](failed-to-gain-authorization.png)
+
+Follow these steps if this error popup when using `Instruments` to trace allocation.
+1. create an plist file
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.get-task-allow</key>
+    <true/>
+</dict>
+</plist>
+
+```
+2. code sign the executable with this plist as entitlement
+```bash
+codesign -s --v -f --entitlements /path/to/entitlements.plist /path/to/executable
+```
+use this command to find signning identity on mac: `security find-identity -v -p codesigning`
+
 ## 20/10/2024
 ### Repetition test
 setup the repetition test framework, test on 3 read file functions(`fread`, `CFReadStream` and `read`) to see their bandwidth. The results is as following:

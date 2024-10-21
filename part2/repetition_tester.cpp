@@ -46,7 +46,7 @@ static void NewTestWave(
             Tester->Mode = TestMode_Testing;
             Tester->TargetProcessedByteCount = TargetProcessedByteCount;
             Tester->CPUTimerFreq = CPUTimerFreq;
-            Tester->PrintNewMinimums = true;
+            Tester->PrintNewMinimums = false;
             Tester->Results.MinTime = (u64)-1;
             Tester->Results.MaxTime = 0;
         }
@@ -137,8 +137,8 @@ static b32 IsTesting(repetition_tester *Tester) {
                 //udpate the slowest time
                 if (Results->MaxTime < ElapsedTime) {
                     Results->MaxTime = ElapsedTime;
-                    PrintTime("Max", Results->MaxTime, Tester->CPUTimerFreq, Tester->BytesAccumulatedOnThisTest);
-                    printf("            \n");
+                    // PrintTime("Max", Results->MaxTime, Tester->CPUTimerFreq, Tester->BytesAccumulatedOnThisTest);
+                    // printf("            \n");
                 }
                 //update the fastest time
                 if (Results->MinTime > ElapsedTime) {
