@@ -176,10 +176,26 @@ static void ReadViaCFReadStream(repetition_tester *Tester, read_parameters *Para
     }
 }
 
+static void WriteToAllBytes(repetition_tester *Tester, read_parameters *Params) {
+    while (IsTesting(Tester)) {
+        buffer Dest = Params->Dest;
+        HandleAllocation(Params, &Dest);
+        BeginTime(Tester);
+        for (int i = 0; i < Dest.Count; i++) {
+            Dest.Data[i] = (u8)i;
+        }
+        EndTime(Tester);
+
+        CountBytes(Tester, Dest.Count);
+        HandleDeallocation(Params, &Dest);
+    }
+}
+
 test_function TestFunctions[] = {
-    {"ReadFile", ReadViaCFReadStream},
-    {"fread", ReadViaFRead},
-    {"read", ReadViaRead}
+    // {"ReadFile", ReadViaCFReadStream},
+    // {"fread", ReadViaFRead},
+    // {"read", ReadViaRead}
+    {"WriteToAllBytes", WriteToAllBytes}
 };
 
 int main(int argc, char** argv) {

@@ -1,6 +1,7 @@
 #include "common.h"
 // #include <x86intrin.h>
 #include <sys/time.h>
+#include <sys/resource.h>
 
 //for apple sillicon
 //https://lemire.me/blog/2023/03/21/counting-cycles-and-instructions-on-arm-based-apple-systems/
@@ -22,6 +23,12 @@ static u64 ReadOSTimer(void)
 	
 	u64 Result = GetOSTimerFreq()*(u64)Value.tv_sec + (u64)Value.tv_usec;
 	return Result;
+}
+
+static u64 ReadOSPageFaultCount(void) {
+    struct rusage usage;
+    getrusage(RUSAGE_SELF, &usage);
+    return usage.ru_minflt + usage.ru_majflt;
 }
 
 

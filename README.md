@@ -1,6 +1,26 @@
 My homework assignment for performance awareness programming
+## 22/10/2024
+Add page fault counter, reproduced Casey's results. On my apple M3, the page size is 16KiB, the results align with Casey's.
+```
+CPU Freq: 4008333660, FileSize: 1071269247
+
+--- WriteToAllBytes None---
+
+Min: 3218758165 (803.016525ms) 1.242437GB/s PF: 0 (0.00 faults/second)
+Max: 3492082340 (871.205502ms) 1.145192GB/s PF: 65386 (4748.69 faults/second)
+Avg: 3246576620 (809.956679ms) 1.231791GB/s PF: 32693 (2374.35 faults/second)
+
+--- WriteToAllBytes Malloc---
+
+Min: 3441616162 (858.615189ms) 1.161984GB/s PF: 65386 (4722.54 faults/second)
+Max: 3557412438 (887.504070ms) 1.124161GB/s PF: 65386 (4722.54 faults/second)
+Avg: 3468588460 (865.344244ms) 1.152948GB/s PF: 65386 (4722.54 faults/second)
+```
+
 ## 21/10/2024
 ### Comparison with malloc every read
+
+When the file size is 5MB, Surround read file by malloc and free effectively reduce the bandwidth by half
 ```
 CPU Freq: 3994346450, FileSize: 5358880
 
@@ -41,7 +61,47 @@ Max: 4056316 (1.015514ms) 4.914599GB/s
 Avg: 970002 (0.242844ms) 20.551667GB/s
 ```
 
-Surround read file by malloc and free effectively reduce the bandwidth by half
+
+On the other hand, when file size is 500MB, malloc version has faster bandwidth
+```
+CPU Freq: 3977604880, FileSize: 535615136
+
+--- ReadFile None---
+
+Min: 199763827 (50.222139ms) 9.932481GB/s
+Max: 272624840 (68.539950ms) 7.277952GB/s
+Avg: 264083271 (66.392535ms) 7.513352GB/s
+
+--- ReadFile Malloc---
+
+Min: 199394195 (50.129211ms) 9.950894GB/s
+Max: 225527193 (56.699245ms) 8.797833GB/s
+Avg: 204626724 (51.444709ms) 9.696439GB/s
+
+--- fread None---
+
+Min: 252069794 (63.372256ms) 7.871433GB/s
+Max: 272562437 (68.524262ms) 7.279618GB/s
+Avg: 266931196 (67.108525ms) 7.433191GB/s
+
+--- fread Malloc---
+
+Min: 200014084 (50.285056ms) 9.920054GB/s
+Max: 289947538 (72.895008ms) 6.843136GB/s
+Avg: 203920779 (51.267229ms) 9.730007GB/s
+
+--- read None---
+
+Min: 251272789 (63.171883ms) 7.896400GB/s
+Max: 273195438 (68.683403ms) 7.262751GB/s
+Avg: 266383987 (66.970952ms) 7.448460GB/s
+
+--- read Malloc---
+
+Min: 199296907 (50.104752ms) 9.955752GB/s
+Max: 219131358 (55.091283ms) 9.054617GB/s
+Avg: 202918850 (51.015336ms) 9.778049GB/s
+```
 
 ### Instruments cannot trace
 ![alt text](failed-to-gain-authorization.png)
