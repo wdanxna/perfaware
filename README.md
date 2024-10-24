@@ -1,4 +1,50 @@
 My homework assignment for performance awareness programming
+## 24/10/2024
+### Loop Assembly
+Based on the writeToAllBytes function previously written, inspecting the assembly to reporduce what Caesy's results.
+Use `-O1` as optimization level, the clang managed to output similar assembly as of the video.
+```
+strb w8, [x28, x8]
+add x8, x8, #0x1
+cmp x27, x8
+b.ne 0x1000026b8
+```
+As the assembly has shown, each iteration write 1 byte to the memory and all 4 instructions take 16 bytes.
+
+I then test the bandwidth on the loop:
+```
+CPU Freq: 4011913230, FileSize: 1071269247
+
+--- WriteToAllBytes None---
+
+Min: 1072185691 (267.250469ms) 3.733192GB/s PF: 0 (0.00 faults/second)
+Max: 1342896198 (334.727129ms) 2.980629GB/s PF: 65386 (2964.23 faults/second)
+Avg: 1079219713 (269.003752ms) 3.708860GB/s PF: 32693 (1482.12 faults/second)
+
+--- WriteToAllBytes Malloc---
+
+Min: 1259888957 (314.036941ms) 3.177006GB/s PF: 65386 (4460.01 faults/second)
+Max: 1419888318 (353.918003ms) 2.819007GB/s PF: 65386 (4460.01 faults/second)
+Avg: 1278624171 (318.706836ms) 3.130454GB/s PF: 65386 (4460.01 faults/second)
+```
+Since each iteration write 1 byte, the bandwidth just equals to the # of iterations. we can say that
+iteration frequency is `3.733192 * 1000^3` iteration per second. Then since we know the CPU frequency
+we can do `CPUFreq / IterFreq` to get how many cycles per iteration: `4011913230/(3.733192 * 1000^3) = 1.00085539626611768685`, it's about 1 cycle per loop on my M3.
+
+## 23/10/2024
+### Testing page fault pattern
+This experiment is to find the pattern behind the mechanism that the OS issuing page fault.
+The code receive a number N as total number of pages it will allocate. It then loop through [0, PageCount]
+as touch size i, in each iteration, it'll mmap N pages of fresh memory, then access individual bytes in that memory up until the ith page. This way, we can compare the # of page we accessed aginst # of page faults to spot whether there is any pattern.
+
+Sadly on my M3 there seems like no page prefetch happening (the TouchCount always equals to FaultCount),one of the reasons might be the case that `getrusage` which I used to report the page fault count does not refelect the actual page fault behaviour, thus even if there is indeed prefetching happening but this function just cannot detect that.
+
+
+### mapping virtual memory on Macos
+```c
+mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+```
+
 ## 22/10/2024
 Add page fault counter, reproduced Casey's results. On my apple M3, the page size is 16KiB, the results align with Casey's.
 ```
