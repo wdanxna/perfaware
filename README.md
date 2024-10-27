@@ -1,4 +1,130 @@
 My homework assignment for performance awareness programming
+## 27/10/2024
+### Setup the assembly playground
+what I gonna do is to reproduce the assembly playground on MacOS.
+
+1. Get hands on MacOS ABI document, understand how to pass parameters using registers
+2. Get a NASM counterpart for arm, use it to produce a C library that can be linked.
+3. reporduce Casey's results.
+
+what's intresting is that x86 delegates calling conventions to operating systems but ARM defines its own calling conventions, that said, all chips that based on ARM architecture must adhere to a single calling conventions defined by ARM.
+
+According to [ARM Procedure Call Standard](https://developer.arm.com/documentation/102374/0101/Procedure-Call-Standard), function parguments less then 8 use x0-x7 registers, return value uses x0-x1.
+
+handwritten assembly should looks like this:
+```c
+    .section    __TEXT,__text,regular,pure_instructions
+    .global     _writeAllBytes        // Make the function globally accessible
+    .align      2                     // Align the function to a 4-byte boundary
+
+_writeAllBytes:
+    //x0 first parameter, the count
+    //x1 second parameter, the data pointer
+    eor x8, x8, x8 //set x8 to 0
+    loop:
+    strb w8, [x1, x8]
+    add x8, x8, #0x1
+    cmp x0, x8
+    b.ne loop
+    ret
+```
+the `.global` is used to export symbol.
+save the file into `writeBytes.s` text file.
+
+Use `clang` to assemble the assembly file into an object file.
+```bash
+clang -c -arch arm64 -o wirteBytes.o writeBytes.s
+```
+
+Then link the object file with C++ code
+```bash
+clang -o main main.cpp writeBytes.o
+```
+
+### Test all variants in assembly
+To find out if CPU is actually throttled by 'increment dependency chain', we implemented few variants of the WriteAllBytes function.
+`writeAllBytesASM` is exactly the same as C++ verion but written in assembly, when we do repetition test on this version, its throughput should be exactly the same as that of the C++ version.
+
+`NopAllBytesASM` replaces the `strb` instruction with `NOP`, this will show that whether access to memory will effect the throughput.
+
+`CMPAllBytesASM` repalces the `strb` or `NOP` with nothing, so it's just an empty loop.
+
+`DecAllBytesASM` is a empty loop too, but use no extra register, it directly decrement the x0 which is the count parameter. This is the minimalist a loop can be.
+
+setting up all those assembly function in repetition test and run to get the result
+```
+CPU Freq: 3979409490, FileSize: 1071269247
+
+--- WriteToAllBytes None---
+
+Min: 1072189581 (269.434343ms) 3.702933GB/s PF: 0 (0.00 faults/second)
+Max: 1279726204 (321.586961ms) 3.102418GB/s PF: 65386 (3545.32 faults/second)
+Avg: 1079292105 (271.219161ms) 3.678565GB/s PF: 32693 (1772.66 faults/second)
+
+--- WriteToAllBytes Malloc---
+
+Min: 1264468152 (317.752711ms) 3.139854GB/s PF: 65386 (3017.38 faults/second)
+Max: 1415598163 (355.730710ms) 2.804642GB/s PF: 65386 (3017.38 faults/second)
+Avg: 1287057870 (323.429361ms) 3.084745GB/s PF: 65386 (3017.38 faults/second)
+
+--- writeAllBytesASM None---
+
+Min: 1072152788 (269.425097ms) 3.703060GB/s PF: 0 (0.00 faults/second)
+Max: 1178318100 (296.103757ms) 3.369418GB/s PF: 0 (0.00 faults/second)
+Avg: 1076413501 (270.495787ms) 3.688402GB/s PF: 0 (0.00 faults/second)
+
+--- writeAllBytesASM Malloc---
+
+Min: 1264247896 (317.697362ms) 3.140401GB/s PF: 65386 (2469.85 faults/second)
+Max: 1418759064 (356.525024ms) 2.798393GB/s PF: 65386 (2469.85 faults/second)
+Avg: 1284751298 (322.849735ms) 3.090284GB/s PF: 65386 (2469.85 faults/second)
+
+--- NopAllBytesASM None---
+
+Min: 1072000279 (269.386773ms) 3.703587GB/s PF: 0 (0.00 faults/second)
+Max: 1079508711 (271.273593ms) 3.677827GB/s PF: 0 (0.00 faults/second)
+Avg: 1072793480 (269.586099ms) 3.700848GB/s PF: 0 (0.00 faults/second)
+
+--- NopAllBytesASM Malloc---
+
+Min: 1071784479 (269.332543ms) 3.704332GB/s PF: 0 (0.00 faults/second)
+Max: 1084556942 (272.542181ms) 3.660708GB/s PF: 0 (0.00 faults/second)
+Avg: 1074778945 (270.085033ms) 3.694012GB/s PF: 0 (0.00 faults/second)
+
+--- CMPAllBytesASM None---
+
+Min: 1071989390 (269.384036ms) 3.703624GB/s PF: 0 (0.00 faults/second)
+Max: 1076876082 (270.612030ms) 3.686818GB/s PF: 0 (0.00 faults/second)
+Avg: 1072684716 (269.558767ms) 3.701223GB/s PF: 0 (0.00 faults/second)
+
+--- CMPAllBytesASM Malloc---
+
+Min: 1072058339 (269.401363ms) 3.703386GB/s PF: 0 (0.00 faults/second)
+Max: 1081389722 (271.746279ms) 3.671429GB/s PF: 0 (0.00 faults/second)
+Avg: 1074594718 (270.038738ms) 3.694645GB/s PF: 0 (0.00 faults/second)
+
+--- DecAllBytesASM None---
+
+Min: 1071932778 (269.369810ms) 3.703820GB/s PF: 0 (0.00 faults/second)
+Max: 1087229193 (273.213701ms) 3.651710GB/s PF: 0 (0.00 faults/second)
+Avg: 1073776263 (269.833066ms) 3.697461GB/s PF: 0 (0.00 faults/second)
+
+--- DecAllBytesASM Malloc---
+
+Min: 1071913808 (269.365043ms) 3.703885GB/s PF: 0 (0.00 faults/second)
+Max: 1085666211 (272.820933ms) 3.656967GB/s PF: 0 (0.00 faults/second)
+Avg: 1073123359 (269.668995ms) 3.699711GB/s PF: 0 (0.00 faults/second)
+```
+
+#### Analysis
+`WriteToAllBytes` and `writeAllBytesASM` shows identical result, as expected, since they almost do same things in instruction level.
+
+`NopAllBytesASM`'s result align with the result of `WriteToAllBytes` when no page fault is happening, that is expected since `NopAllBytesASM` does not access to any memory.
+
+`CMPAllBytesASM` and `DecAllBytesASM` compares to `NopAllBytesASM`, showing no bandwidth gain.
+
+
+
 ## 24/10/2024
 ### Loop Assembly
 Based on the writeToAllBytes function previously written, inspecting the assembly to reporduce what Caesy's results.

@@ -191,11 +191,73 @@ static void WriteToAllBytes(repetition_tester *Tester, read_parameters *Params) 
     }
 }
 
+
+
+extern "C" void writeAllBytesASM(u64 count, u8* data);
+static void STRBToAllBytes(repetition_tester *Tester, read_parameters *Params) {
+    while (IsTesting(Tester)) {
+        buffer Dest = Params->Dest;
+        HandleAllocation(Params, &Dest);
+        BeginTime(Tester);
+        writeAllBytesASM(Dest.Count, Dest.Data);
+        EndTime(Tester);
+
+        CountBytes(Tester, Dest.Count);
+        HandleDeallocation(Params, &Dest);
+    }
+}
+
+extern "C" void NopAllBytesASM(u64 count, u8* data);
+static void NopToAllBytes(repetition_tester *Tester, read_parameters *Params) {
+    while (IsTesting(Tester)) {
+        buffer Dest = Params->Dest;
+        HandleAllocation(Params, &Dest);
+        BeginTime(Tester);
+        NopAllBytesASM(Dest.Count, Dest.Data);
+        EndTime(Tester);
+
+        CountBytes(Tester, Dest.Count);
+        HandleDeallocation(Params, &Dest);
+    }
+}
+
+extern "C" void CMPAllBytesASM(u64 count, u8* data);
+static void CMPToAllBytes(repetition_tester *Tester, read_parameters *Params) {
+    while (IsTesting(Tester)) {
+        buffer Dest = Params->Dest;
+        HandleAllocation(Params, &Dest);
+        BeginTime(Tester);
+        CMPAllBytesASM(Dest.Count, Dest.Data);
+        EndTime(Tester);
+
+        CountBytes(Tester, Dest.Count);
+        HandleDeallocation(Params, &Dest);
+    }
+}
+
+extern "C" void DecAllBytesASM(u64 count, u8* data);
+static void DecToAllBytes(repetition_tester *Tester, read_parameters *Params) {
+    while (IsTesting(Tester)) {
+        buffer Dest = Params->Dest;
+        HandleAllocation(Params, &Dest);
+        BeginTime(Tester);
+        DecAllBytesASM(Dest.Count, Dest.Data);
+        EndTime(Tester);
+
+        CountBytes(Tester, Dest.Count);
+        HandleDeallocation(Params, &Dest);
+    }
+}
+
 test_function TestFunctions[] = {
     // {"ReadFile", ReadViaCFReadStream},
     // {"fread", ReadViaFRead},
     // {"read", ReadViaRead}
-    {"WriteToAllBytes", WriteToAllBytes}
+    {"WriteToAllBytes", WriteToAllBytes},
+    {"writeAllBytesASM", STRBToAllBytes},
+    {"NopAllBytesASM", NopToAllBytes},
+    {"CMPAllBytesASM", CMPToAllBytes},
+    {"DecAllBytesASM", DecToAllBytes}
 };
 
 int main(int argc, char** argv) {
