@@ -3,7 +3,53 @@
     .global     _NopAllBytesASM
     .global     _CMPAllBytesASM
     .global     _DecAllBytesASM
+    .global     _NOP1AllBytes
+    .global     _NOP3AllBytes
+    .global     _NOP9AllBytes
     .align      2                     // Align the function to a 4-byte boundary
+
+
+
+//Those following functions are dedicated to experiment the ramification of Nops for throughput
+//This has a sigle nop
+_NOP1AllBytes:
+    eor x8, x8, x8 //set x8 to 0
+    1:
+    nop
+    add x8, x8, #0x1
+    cmp x0, x8
+    b.ne 1b
+    ret
+
+//This has 3 nops
+_NOP3AllBytes:
+    eor x8, x8, x8 //set x8 to 0
+    1:
+    nop
+    nop
+    nop
+    add x8, x8, #0x1
+    cmp x0, x8
+    b.ne 1b
+    ret
+
+//9 nops
+_NOP9AllBytes:
+    eor x8, x8, x8 //set x8 to 0
+    1:
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    add x8, x8, #0x1
+    cmp x0, x8
+    b.ne 1b
+    ret
 
 //this function replicate what C++ code does
 _writeAllBytesASM:

@@ -124,6 +124,39 @@ Avg: 1073123359 (269.668995ms) 3.699711GB/s PF: 0 (0.00 faults/second)
 `CMPAllBytesASM` and `DecAllBytesASM` compares to `NopAllBytesASM`, showing no bandwidth gain.
 
 
+### Stressing the front end of CPU
+Following the previous video, now we can design a program in assembly that can stress out the front end of the CPU. In the video, we know that the CPU consists of two major parts, one is called the front end, the other is called the back end. What the front end does is it is responsible for fetching and decoding instructions we feed into the CPU, it then transfroms instructions into what is known as micro-op, those are the lower level representation of instructions that the CPU back end uses to do the actual computation. The front end and the back end are connected through a queue, into which the front end keeps fetching and transforming the instructions into micro-ops and pushes them, on the other hand, the back end is chewing up micro-ops from the queue, consuming them. This seperation creates a bottleneck if the front end is not capable of feeding micro-ops into the queue fast enough.
+
+In this experiment, we'll design a program in assembly that specifically stresses the front end instead of the back end, we do it by means of inserting a lot of NOPs into the loop we had previously written. Since the NOPs will not incur any work for the back end, but they will certainly do so for the front end because it needs to decode them.
+
+What deviates from the video is that we are dealing with an ARM CPU here, and because the ARM uses fixed-length instructions, there are no variable-length NOPs at my disposal, anyway, let me try to code the experiment to actually test it out.
+
+First, I'll re-design the repetition test framework so that it can directly test the assembly routines without the wrapper. Then I need to write a new variety of functions like those in the video to test the throughput. Finally I'll analyze the results and try to figure out a plausible explanation for it.
+
+After a while, I've completed the refactoring as well as the test, here is the results
+```
+CPU Freq: 3499729160, FileSize: 1071269247
+
+--- NOP1AllBytes None---
+
+Min: 1071609856 (306.197939ms) 3.258341GB/s PF: 0 (0.00 faults/second)
+Max: 1079866299 (308.557105ms) 3.233428GB/s PF: 0 (0.00 faults/second)
+Avg: 1073300627 (306.681054ms) 3.253208GB/s PF: 0 (0.00 faults/second)
+
+--- NOP3AllBytes None---
+
+Min: 1071831192 (306.261183ms) 3.257668GB/s PF: 0 (0.00 faults/second)
+Max: 1088088398 (310.906458ms) 3.208995GB/s PF: 0 (0.00 faults/second)
+Avg: 1072661409 (306.498406ms) 3.255147GB/s PF: 0 (0.00 faults/second)
+
+--- NOP9AllBytes None---
+
+Min: 1310084785 (374.338906ms) 2.665225GB/s PF: 0 (0.00 faults/second)
+Max: 1317993255 (376.598644ms) 2.649232GB/s PF: 0 (0.00 faults/second)
+Avg: 1312230544 (374.952028ms) 2.660866GB/s PF: 0 (0.00 faults/second)
+```
+
+As we can see, 1 nop and 3 nops actually have little differences, while 9 nops significantly reduced the throughput. If our guesses were correct(that the `nop` incurs no load for the back end) then it means that we successfully throttled the CPU by overflowing its front end.
 
 ## 24/10/2024
 ### Loop Assembly
