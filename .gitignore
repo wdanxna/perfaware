@@ -14,3 +14,4 @@ part2/haversine_compare_instrumented
 part2/read_overhead_test
 part2/page_fault_test
 *.o
+part2/asm_test

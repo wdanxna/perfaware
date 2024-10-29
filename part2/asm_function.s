@@ -6,9 +6,26 @@
     .global     _NOP1AllBytes
     .global     _NOP3AllBytes
     .global     _NOP9AllBytes
+    .global     _ConditionalNOP
     .align      2                     // Align the function to a 4-byte boundary
 
 
+//experiment that probing the branch selection behaviour
+_ConditionalNOP:
+    mov x8, #0x0
+1:
+    ldrb w2, [x1, x8]
+    add x8, x8, #0x1 //increment
+    cmp x2, #0x1
+    b.eq .skip // take the jump if data[i] == 1
+    //FallthroughBranch
+    nop
+.skip:
+    //TakenBranch
+    cmp x8, x0
+    b.ne 1b
+    ret
+    
 
 //Those following functions are dedicated to experiment the ramification of Nops for throughput
 //This has a sigle nop

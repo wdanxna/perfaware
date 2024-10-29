@@ -1,4 +1,92 @@
 My homework assignment for performance awareness programming
+## 29/10/2024
+### Apple Silicon Branch Terminology
+**Target Address**: The next program counter (PC) address specified by a control flow altering instruction
+
+**Conditional Branch**: A control flow altering instruction where the next PC is the Target Address or the current PC+4, depending on evaluation of a condition.
+
+**Taken Branch**: An unconditional branch or a conditional branch with a TRUE condition. The PC is updated to the Target Address.
+
+**Predicted Branch**: A branch for which the processor will make an "educated guess" as to the condition and/or target address of the branch. The processor will begin fetching instructions after fetching a branch according the prediction.The processor will check the prediction against the actual outcome when the branch executes. Generally, all branches are predicated with the exception of direct unconditional branches.
+
+**Correctly Predicted Branch**: A predicted branch for which the actual outcome matches that of the prediciton.
+
+**Mispredicted Branch**: A predicted branch for which the actual outcome does not match the prediction. Instructions fetched after the branch must be flushed from the machine.
+
+### Reflection
+Yesterday I was mainly reading the Apple Silicon CPU Optimization Guide and tried to get information that can explain what I observed at previous experiment, which is that the throughput across all variants of code was 1.8GB/s no matter how many nops I put into the false branch.
+
+After watching the video and reading the optimization guide, it revealed to me the falw in my experiment. The optimization guide says **taking branch itself will cost performance**. That explains why no matter how many nops I put in, even zero nops, brought down the throughput from 3GB/s to 1.8. It's because in previous experiment, the code was written in a way that it always takes branch.
+
+### Redesign the experiment
+Here is how to properly test. Similar to what we've done before, we setup a loop, this time, we design it in a way that we can control whether the code branches or not. We can even make the code branches in a pattern we specified.
+```c
+_ConditionalNOP:
+    mov x8, #0x0
+1:
+    ldrb w2, [x1, x8]
+    add x8, x8, #0x1 //increment
+    cmp x2, #0x1
+    b.eq .skip // take the jump if data[i] == 1
+    //FallthroughBranch
+    nop
+.skip:
+    //TakenBranch
+    cmp x8, x0
+    b.ne 1b
+    ret
+```
+what this function looks like in C would be `void ConditionNOP(int count, u8* data);`. Now we can provide different data to test different branching patterns.
+
+This is the final results of experiment on my M3 mbp
+```
+CPU Freq: 3970940410, FileSize: 1071269247
+
+--- ConditionalNOP Never---
+
+Min: 1073146482 (270.249959ms) 3.691757GB/s PF: 0 (0.00 faults/second)
+Max: 1121113761 (282.329535ms) 3.533804GB/s PF: 0 (0.00 faults/second)
+Avg: 1076750168 (271.157473ms) 3.679402GB/s PF: 0 (0.00 faults/second)
+
+--- ConditionalNOP Awalys---
+
+Min: 2144715241 (540.102600ms) 1.847236GB/s PF: 0 (0.00 faults/second)
+Max: 2162015070 (544.459208ms) 1.832455GB/s PF: 0 (0.00 faults/second)
+Avg: 2148695099 (541.104846ms) 1.843815GB/s PF: 0 (0.00 faults/second)
+
+--- ConditionalNOP Every 2---
+
+Min: 2680514617 (675.032698ms) 1.477998GB/s PF: 0 (0.00 faults/second)
+Max: 2738440429 (689.620127ms) 1.446735GB/s PF: 0 (0.00 faults/second)
+Avg: 2687746113 (676.853802ms) 1.474022GB/s PF: 0 (0.00 faults/second)
+
+--- ConditionalNOP Every 3---
+
+Min: 2147513204 (540.807210ms) 1.844830GB/s PF: 0 (0.00 faults/second)
+Max: 2258547012 (568.768800ms) 1.754135GB/s PF: 0 (0.00 faults/second)
+Avg: 2186193773 (550.548119ms) 1.812189GB/s PF: 0 (0.00 faults/second)
+
+--- ConditionalNOP Every 4---
+
+Min: 1903025867 (479.238082ms) 2.081840GB/s PF: 0 (0.00 faults/second)
+Max: 2690190169 (677.469287ms) 1.472683GB/s PF: 0 (0.00 faults/second)
+Avg: 2241625170 (564.507381ms) 1.767377GB/s PF: 0 (0.00 faults/second)
+
+--- ConditionalNOP RandomOS---
+
+Min: 11360115885 (2860.812481ms) 0.348746GB/s PF: 0 (0.00 faults/second)
+Max: 11412899970 (2874.105071ms) 0.347133GB/s PF: 0 (0.00 faults/second)
+Avg: 11386726983 (2867.513940ms) 0.347931GB/s PF: 0 (0.00 faults/second)
+```
+- As we can see, took branch every time did bring throughput down to 1.8GB/s.
+- The CPU handles every 2 jumps poorly, throughput downed more than 20%
+- Every 3 jumps brought the throughput back to that of the Awalys jump.
+- Every 4 jumps's throughput exceeds that of the Awalys jump.
+- Finally, the random jumps shows worst performance, that shows how constantly mispredict incurs huge performance penalty.
+
+we can calculate how many cycles per iteration in the worst case:
+`3970940410/(0.347931*1024*1024*1024) = 10.6` that means in the worst case, 1 crank takes 10 cycles to finish. As mentioned in the video, that number roughly equals to the number of pipeline stages the CPU has. Since every iteration, when mispredict happens, the branch instruction must be at the end of pipeline, misprediction means the entire pipeline must be flushed, then CPU must spend 10 cycles to move micro-ops through the piepine, assuming CPU move 1 stage per cycle, then it shall cost it 10 cycles to fill a 10 stages pipeline.
+
 ## 27/10/2024
 ### Setup the assembly playground
 what I gonna do is to reproduce the assembly playground on MacOS.
@@ -157,6 +245,30 @@ Avg: 1312230544 (374.952028ms) 2.660866GB/s PF: 0 (0.00 faults/second)
 ```
 
 As we can see, 1 nop and 3 nops actually have little differences, while 9 nops significantly reduced the throughput. If our guesses were correct(that the `nop` incurs no load for the back end) then it means that we successfully throttled the CPU by overflowing its front end.
+
+### Challenge: probing the branch behaviour
+We know that in order to achieve instruction level parallelism, the front end must decode instructions as many and as fast as possible, but how does it know what to fetch when it sees conditional branch instruction? since the condition is changing in realtime, the font end can't possibly know beforehand which branch it would take.
+
+I vaguely know the terms branch prediction, which works as it picking a branch randomly but re-fetch another branch if its guess were wrong.
+
+How can we design an experiment to prob the behaviour behind the way the front end handles conditional branch? We can't rely on any program executing output, since the correctness of the program is guaranteed, we can't ask our code to tell us if CPU made a wrong guess.
+
+one way I can think of is to put different amount of `nop`s in both branches
+```c
+while (N) {
+
+    if (Cond) {
+        nop*10
+    }
+    else {
+        nothing
+    }
+    N--;
+}
+```
+we iterate N times, in the loop, we choose 1 branch that has 10 nops, and another with empty things. we setup the condition as always false, thus the actual path would take zero nops instead of 10 nops. We then test the throughput of the code, if it's pretty low, that means the front end must have fetched the flase branch.
+
+I tested several variants of above code, including removal of all 10 nops, but the throughput was 1.8GB/s across all variants, no matter how many nops in non-taken branch.
 
 ## 24/10/2024
 ### Loop Assembly
