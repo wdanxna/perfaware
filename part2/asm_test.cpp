@@ -141,13 +141,47 @@ extern "C" {
     void NOP3AllBytes(u64 count, u8* data);
     void NOP9AllBytes(u64 count, u8* data);
     void ConditionalNOP(u64 count, u8* data);
+
+    //code alignment test
+    void NOPAlign64(u64 count, u8* data);
+    void NOPAlign64_Pad4(u64 count, u8* data);
+    void NOPAlign64_Pad20(u64 count, u8* data);
+    void NOPAlign64_Pad40(u64 count, u8* data);
+    void NOPAlign64_Pad60(u64 count, u8* data);
+
+    //read ports
+    void Read_x1(u64 count, u8* data);
+    void Read_x2(u64 count, u8* data);
+    void Read_x3(u64 count, u8* data);
+    void Read_x4(u64 count, u8* data);
+
+    //write ports
+    void Write_x1(u64 count, u8* data);
+    void Write_x2(u64 count, u8* data);
+    void Write_x3(u64 count, u8* data);
+    void Write_x4(u64 count, u8* data);
 };
 
 test_function TestFunctions[] = {
     // {"NOP1AllBytes", NOP1AllBytes},
     // {"NOP3AllBytes", NOP3AllBytes},
     // {"NOP9AllBytes", NOP9AllBytes},
-    {"ConditionalNOP", ConditionalNOP}
+    // {"ConditionalNOP", ConditionalNOP}
+
+    // {"NOPAlign64", NOPAlign64},
+    // {"NOPAlign64_Pad4",NOPAlign64_Pad4},
+    // {"NOPAlign64_Pad20",NOPAlign64_Pad20},
+    // {"NOPAlign64_Pad40",NOPAlign64_Pad40},
+    // {"NOPAlign64_Pad60",NOPAlign64_Pad60}
+
+    // {"Read_x1", Read_x1},
+    // {"Read_x2", Read_x2},
+    // {"Read_x3", Read_x3},
+    // {"Read_x4", Read_x4},
+    {"Write_x1",Write_x1},
+    {"Write_x2",Write_x2},
+    {"Write_x3",Write_x3},
+    {"Write_x4",Write_x4}
 };
 
 
@@ -165,21 +199,21 @@ int main(int argc, char** argv) {
         printf("CPU Freq: %llu, FileSize: %llu\n", CPUTimerFreq, Stat.st_size);
 
         if (Dest.Count > 0) {
-            repetition_tester Testers[ArrayCount(TestFunctions)][BranchPatternCount] = {};
+            repetition_tester Testers[ArrayCount(TestFunctions)] = {};
 
             for (;;) {
                 for (u32 FuncIndex = 0; FuncIndex < ArrayCount(TestFunctions); ++FuncIndex) {
 
                     // for (u32 AllocIndex = 0; AllocIndex < AllocTypeCount-1; ++AllocIndex) {
                     //     auto AllocType = (AllocTypes)AllocIndex;
-                    for (u32 PatternIndex = 0; PatternIndex < BranchPatternCount; ++PatternIndex) {
+                    for (u32 PatternIndex = 0; PatternIndex < 1; ++PatternIndex) {
                         
-                        const char* patternDesc;
-                        fillBranchPatterns((BranchPatterns)PatternIndex, &Dest, &patternDesc);
+                        // const char* patternDesc;
+                        // fillBranchPatterns((BranchPatterns)PatternIndex, &Dest, &patternDesc);
                         
-                        repetition_tester *Tester = &Testers[FuncIndex][PatternIndex];
+                        repetition_tester *Tester = &Testers[FuncIndex];
                         test_function TestFunc = TestFunctions[FuncIndex];
-                        printf("\n--- %s %s---\n", TestFunc.Name, patternDesc);
+                        printf("\n--- %s ---\n", TestFunc.Name);
                         NewTestWave(Tester, Dest.Count, CPUTimerFreq);
                         while (IsTesting(Tester)) {
                             buffer Buffer = Dest;//copy

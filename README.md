@@ -1,4 +1,149 @@
 My homework assignment for performance awareness programming
+## 31/10/2024
+### Register renaming
+To achieve instruction level parallelism, the less dependencies the better. There are cases called false-dependency which will impede CPU from executing instructions as parallel as possible even if the dependency is kind of "fake".
+
+To elaborate, we can investigate by exmaples:
+```
+r1 = r2 + 1
+r1 = r3
+```
+This pattern is identified as "write-after-write" situation, which `r1 = r3` must wait until `r1 = r2 + 1` has completed. That's because both instructions are trying to write to the same place, its a data race, so the operations need to be executed serially.
+
+But why its "false" anyway? let's look at this example:
+```
+r1 = r2 + 1
+r1 = r3
+r4 = r1
+```
+just like the previous example, but added 1 instruction that read from `r1`. For perspective of r4, it doesn't really care about how many times r1 has been written to, it just cares about what's the lastest value r1 is currently holding. Another words, r4 doesn't depend on the any instructions before `r1 = r3`. If we modify the instructions into:
+```
+r1 = r2 + 1
+rx = r3
+r4 = rx
+```
+then the last 2 instructions were no longer depending on r1, which means that CPU can now execute them concurrently.
+Wait but what about r1? we still need r1 been updated to r3 right? 
+
+Here comes the register renaming and RAT (Register Aliasing Table). Modern CPUs not only virtualize memroy but also virtualize registers! In fact, CPUs nowadays have hundreds of registers (register file), but because it needs to maintain a reasonable instruction size, ISA only expose certain numbers of them. CPU then uses RAT to keep track of which register name corresponds to which slot in register file. Whenever an instruction write to a destination, CPU assigns a new slot in register file for that destination and updates RAT so that, for example, making r1 points to slot 5:
+```
+r1 = r2 + 1 //write slot 1, RAT: r1->slot1
+r1 = r3 //write slot 5, RAT: r1->slot5
+r4 = r1 //read slot 5
+```
+In this way, write-after-write will no longer incurs data race, thus part of dependency is eliminated.
+
+There is another false dependency called write-after-read
+```
+r1 = r2
+r2 = r3 + 1
+```
+The rationale behind why register renaming can solve it is the same.
+
+### Probing read & write ports
+Now we are at the back end of CPU, schedular now has numerous miro-ops wating to be dispatched. However, CPU has limited execution resources. The channels through which the schedular dispatches uops are called **ports**. Today we'll explore two one them: read and write ports, to estimate how many ports my CPU has.
+
+Based on the repetition test we've been using all along, we construct a series of assembly loops where we gradually increase the number of `mov`s per loop while maintaining a fixed total `mov`s per loop. We then measure the CPU throughput (iterations per second) for each loop, observing throughput changes as the number of `mov`s increases per iteration.
+
+For example, there are 10 things to do in total,
+- version 1, we do 1 thing at a time and do it as fast as possible, recordig the elapsed time.
+- version 2, we do 2 things at a time and do it as fast as possible, recording the elapsed time.
+- version 3, we do 3 things at a time and do it as fast as possible, recording the elapsed time.
+- version 4, we do 4 things at a time and do it as fast as possible, recording the elapsed time.
+At last, we calculate each version's throughput by `10/elapsed_time`. In this way, we hope to find out what's the highest level of concurrency the CPU support for specific operation and that may be the number of specific `ports` the CPU has.
+
+The assembly (ARM64) looks like below:
+```c
+_Read_x1:
+1:
+    ldr x3, [x1]
+    subs x0, x0, #0x1
+    bgt 1b
+    ret
+
+_Read_x2:
+1:
+    ldr x3, [x1]
+    ldr x3, [x1]
+    subs x0, x0, #0x2
+    bgt 1b
+    ret
+```
+
+Experiment results for **read**
+```
+CPU Freq: 4008128450, FileSize: 1071269247
+
+--- Read_x1 ---
+
+Min: 1072071190 (267.474260ms) 3.730068GB/s PF: 0 (0.00 faults/second)
+Max: 1073628550 (267.862810ms) 3.724658GB/s PF: 0 (0.00 faults/second)
+Avg: 1072466039 (267.572772ms) 3.728695GB/s PF: 0 (0.00 faults/second)
+
+--- Read_x2 ---
+
+Min: 535884605 (133.699459ms) 7.462238GB/s PF: 0 (0.00 faults/second)
+Max: 538351912 (134.315035ms) 7.428038GB/s PF: 0 (0.00 faults/second)
+Avg: 536284871 (133.799323ms) 7.456669GB/s PF: 0 (0.00 faults/second)
+
+--- Read_x3 ---
+
+Min: 372163479 (92.852184ms) 10.745006GB/s PF: 0 (0.00 faults/second)
+Max: 390389369 (97.399416ms) 10.243360GB/s PF: 0 (0.00 faults/second)
+Avg: 372541576 (92.946516ms) 10.734100GB/s PF: 0 (0.00 faults/second)
+
+--- Read_x4 ---
+
+Min: 535747136 (133.665161ms) 7.464153GB/s PF: 0 (0.00 faults/second)
+Max: 536890270 (133.950365ms) 7.448261GB/s PF: 0 (0.00 faults/second)
+Avg: 536248228 (133.790180ms) 7.457178GB/s PF: 0 (0.00 faults/second)
+```
+As we can see, 
+- `Read_x1` read from memory once per iteration, and has the lowest throughput, it's about 1 cycle per read.
+- `Read_x2` do 2 reads per loop, its throughput is 2x that of `Read_x1`.
+- `Read_x3` do 3 reads per loop, but its throughput is 3x that of `Read_x1`.
+- `Read_x4` is intresting, its throughput is exactly same as `Read_x2`, weird.
+
+It seems that M3 MAX has 3 read ports
+
+Experiment results for **write**
+```
+CPU Freq: 3997487140, FileSize: 1071269247
+
+--- Write_x1 ---
+
+Min: 1071526276 (268.049962ms) 3.722057GB/s PF: 0 (0.00 faults/second)
+Max: 1073711042 (268.596497ms) 3.714483GB/s PF: 0 (0.00 faults/second)
+Avg: 1072344295 (268.254595ms) 3.719218GB/s PF: 0 (0.00 faults/second)
+
+--- Write_x2 ---
+
+Min: 535748083 (134.021215ms) 7.444323GB/s PF: 0 (0.00 faults/second)
+Max: 555067899 (138.854205ms) 7.185214GB/s PF: 0 (0.00 faults/second)
+Avg: 538054077 (134.598076ms) 7.412418GB/s PF: 0 (0.00 faults/second)
+
+--- Write_x3 ---
+
+Min: 535904936 (134.060453ms) 7.442144GB/s PF: 0 (0.00 faults/second)
+Max: 552256361 (138.150879ms) 7.221794GB/s PF: 0 (0.00 faults/second)
+Avg: 536404448 (134.185409ms) 7.435214GB/s PF: 0 (0.00 faults/second)
+
+--- Write_x4 ---
+
+Min: 535835402 (134.043058ms) 7.443110GB/s PF: 0 (0.00 faults/second)
+Max: 539471968 (134.952771ms) 7.392936GB/s PF: 0 (0.00 faults/second)
+Avg: 536294428 (134.157887ms) 7.436739GB/s PF: 0 (0.00 faults/second)
+```
+- It seems like we only got 2 **write ports** here.
+
+## 30/10/2024
+Upon reading the optimization guide, I noticed that the apple M series L1I cache spec is `192KiB, 6-way, 68B lines`. We know that MacOS uses 16KiB page, that means the bottom 14 bits of virtual address and physical address are the same. If L1 cache uses those 14 bits as key, within wich of 6 bits are used to index inside a cache line (64B), that left of `14-6 = 8` bits to be used as key, which means L1I cache should have `2^(14-6) = 256` entries, since its a 6-way associative cache, that means the total size of L1I cache should be `256*6*64 = 98304 = 96KiB`. That is exactly half of what's on the spec. Im not sure where does the other half come from, maybe somehow there are 512 entries? 
+
+I also cannot find a reliable source of how to dissect M chip virtual address, the closest thing I can find is from AsahiLina's talk which is about GPU virtual addresses.
+
+![alt text](page-tables.png)
+![alt text](image.png)
+
 ## 29/10/2024
 ### Apple Silicon Branch Terminology
 **Target Address**: The next program counter (PC) address specified by a control flow altering instruction
