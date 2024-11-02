@@ -160,6 +160,22 @@ extern "C" {
     void Write_x2(u64 count, u8* data);
     void Write_x3(u64 count, u8* data);
     void Write_x4(u64 count, u8* data);
+
+    //SIMD read
+    void Read_4x1_ldur(u64 count, u8* data);
+    void Read_4x2_ldur(u64 count, u8* data);
+    void Read_4x3_ldur(u64 count, u8* data);
+    void Read_4x4_ldur(u64 count, u8* data);
+    void Read_4x1_ldr(u64 count, u8* data);
+    void Read_4x2_ldr(u64 count, u8* data);
+    void Read_4x3_ldr(u64 count, u8* data);
+    void Read_4x4_ldr(u64 count, u8* data);
+    void Read_8x3_ldr(u64 count, u8* data);
+    void Read_8x3_ld1(u64 count, u8* data);
+    void Read_16x3(u64 count, u8* data);
+    void Read_16x4x1(u64 count, u8* data);
+    void Read_16x4x2(u64 count, u8* data);
+    void Read_16x4x3(u64 count, u8* data);
 };
 
 test_function TestFunctions[] = {
@@ -178,10 +194,25 @@ test_function TestFunctions[] = {
     // {"Read_x2", Read_x2},
     // {"Read_x3", Read_x3},
     // {"Read_x4", Read_x4},
-    {"Write_x1",Write_x1},
-    {"Write_x2",Write_x2},
-    {"Write_x3",Write_x3},
-    {"Write_x4",Write_x4}
+    // {"Write_x1",Write_x1},
+    // {"Write_x2",Write_x2},
+    // {"Write_x3",Write_x3},
+    // {"Write_x4",Write_x4},
+
+    {"Read_4x1_ldur", Read_4x1_ldur},
+    {"Read_4x1_ldr", Read_4x1_ldr},
+    {"Read_4x2_ldur", Read_4x2_ldur},
+    {"Read_4x2_ldr", Read_4x2_ldr},
+    {"Read_4x3_ldur", Read_4x3_ldur},
+    {"Read_4x3_ldr", Read_4x3_ldr},
+    {"Read_4x4_ldur", Read_4x4_ldur},
+    {"Read_4x4_ldr", Read_4x4_ldr},
+    {"Read_8x3_ld1", Read_8x3_ld1},
+    {"Read_8x3_ldr", Read_8x3_ldr},
+    {"Read_16x3", Read_16x3},
+    {"Read_16x4x1", Read_16x4x1},
+    {"Read_16x4x2", Read_16x4x2},
+    {"Read_16x4x3", Read_16x4x3}
 };
 
 

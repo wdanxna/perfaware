@@ -22,7 +22,147 @@
     .global     _Write_x2
     .global     _Write_x3
     .global     _Write_x4
+
+    .global     _Read_4x1_ldur
+    .global     _Read_4x2_ldur
+    .global     _Read_4x3_ldur
+    .global     _Read_4x4_ldur
+    .global     _Read_4x1_ldr
+    .global     _Read_4x2_ldr
+    .global     _Read_4x3_ldr
+    .global     _Read_4x4_ldr
+    .global     _Read_8x3_ldr
+    .global     _Read_8x3_ld1
+    .global     _Read_16x3
+    .global     _Read_16x4x1
+    .global     _Read_16x4x2
+    .global     _Read_16x4x3
     .align      2                     // Align the function to a 4-byte boundary
+
+
+//SIMD read
+_Read_4x1_ldur:
+1:
+    ldur s0, [x1]
+    subs x0, x0, #4
+    bgt 1b
+    ret
+
+_Read_4x1_ldr:
+1:
+    ldr w2, [x1]
+    subs x0, x0, #4
+    bgt 1b
+    ret
+
+_Read_4x2_ldur:
+1:
+    ldur s0, [x1]
+    ldur s0, [x1]
+    subs x0, x0, #8
+    bgt 1b
+    ret
+
+_Read_4x2_ldr:
+1:
+    ldr w2, [x1]
+    ldr w2, [x1]
+    subs x0, x0, #8
+    bgt 1b
+    ret
+
+_Read_4x3_ldur:
+1:
+    ldur s0, [x1]
+    ldur s0, [x1]
+    ldur s0, [x1]
+    subs x0, x0, #12
+    bgt 1b
+    ret
+
+_Read_4x3_ldr:
+1:
+    ldr w2, [x1]
+    ldr w2, [x1]
+    ldr w2, [x1]
+    subs x0, x0, #12
+    bgt 1b
+    ret
+
+
+_Read_4x4_ldur:
+1:
+    ldur s0, [x1]
+    ldur s0, [x1]
+    ldur s0, [x1]
+    ldur s0, [x1]
+    subs x0, x0, #16
+    bgt 1b
+    ret
+
+_Read_4x4_ldr:
+1:
+    ldr w2, [x1]
+    ldr w2, [x1]
+    ldr w2, [x1]
+    ldr w2, [x1]
+    subs x0, x0, #16
+    bgt 1b
+    ret
+
+
+_Read_8x3_ldr:
+1:
+    ldr x2, [x1]
+    ldr x2, [x1]
+    ldr x2, [x1]
+    subs x0, x0, #24
+    bgt 1b
+    ret
+
+_Read_8x3_ld1:
+1:
+    ld1 {V0.1D}, [x1]
+    ld1 {V0.1D}, [x1]
+    ld1 {V0.1D}, [x1]
+    subs x0, x0, #24
+    bgt 1b
+    ret
+
+_Read_16x3:
+1:
+    ld1 {V0.2D}, [x1]
+    ld1 {V0.2D}, [x1]
+    ld1 {V0.2D}, [x1]
+    subs x0, x0, #48
+    bgt 1b
+    ret
+
+_Read_16x4x1:
+1:
+    ld1 {V0.2D, V1.2D, v2.2D, v3.2D}, [x1]
+    subs x0, x0, #64
+    bgt 1b
+    ret
+
+_Read_16x4x2:
+1:
+    ld1 {V0.2D, V1.2D, v2.2D, v3.2D}, [x1]
+    ld1 {V0.2D, V1.2D, v2.2D, v3.2D}, [x1]
+    subs x0, x0, #128
+    bgt 1b
+    ret
+
+_Read_16x4x3:
+1:
+    ld1 {V0.2D, V1.2D, v2.2D, v3.2D}, [x1]
+    ld1 {V0.2D, V1.2D, v2.2D, v3.2D}, [x1]
+    ld1 {V0.2D, V1.2D, v2.2D, v3.2D}, [x1]
+    subs x0, x0, #192
+    bgt 1b
+    ret
+
+
 
 //probing the write ports
 _Write_x1:
@@ -62,34 +202,34 @@ _Write_x4:
 //probing the read ports
 _Read_x1:
 1:
-    ldr x3, [x1]
+    ldrsb x3, [x1]
     subs x0, x0, #0x1
     bgt 1b
     ret
 
 _Read_x2:
 1:
-    ldr x3, [x1]
-    ldr x3, [x1]
+    ldrsb x3, [x1]
+    ldrsb x3, [x1]
     subs x0, x0, #0x2
     bgt 1b
     ret
 
 _Read_x3:
 1:
-    ldr x3, [x1]
-    ldr x3, [x1]
-    ldr x3, [x1]
+    ldrsb x3, [x1]
+    ldrsb x3, [x1]
+    ldrsb x3, [x1]
     subs x0, x0, #0x3
     bgt 1b
     ret
 
 _Read_x4:
 1:
-    ldr x3, [x1]
-    ldr x3, [x1]
-    ldr x3, [x1]
-    ldr x3, [x1]
+    ldrsb x3, [x1]
+    ldrsb x3, [x1]
+    ldrsb x3, [x1]
+    ldrsb x3, [x1]
     subs x0, x0, #0x4
     bgt 1b
     ret

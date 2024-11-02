@@ -1,4 +1,138 @@
 My homework assignment for performance awareness programming
+## 32/10/2024
+### ARM64 SIMD (NEON)
+There are 32 128bits vector registers.
+
+In assembly language, vector registers are specified as `V<register number>.<number of elements><element size letter>`
+
+◦ Byte (8b)
+◦ Halfword (16b)
+◦ Word (32b)
+◦ Doubleword (64b)
+
+![alt text](vector-registers.png)
+
+![alt text](SIMD-INSTS.png)
+
+load scalar to vector register: `LDUR <St>, [<Xn|SP>{, #<simm>}]` (a-profile architecture reference manual, page 3062)
+
+### More throughput from SIMD
+In previous experiment we know that there are 3 read ports and 2 write prots on apple M3 MAX, which means at max it can only execute 3 memory reads per cycle. The max data throughput then can be derived: `3 * 8B register = 24B/cycle`. since the CPU is only capable of taking 3 reads simultaneously, to further increase the throughput, it must increase the volumn of individual read, that's the concept of SIMD (single instruction multiple data).
+
+SIMD instructions for ARM64 is called NEON, unlike X64's AVX which support up to 512 bit, NEON however, top out at 128 bit SIMD. There are some ARM chips support a wider SIMD called SVE, but apple M series do not.
+
+we can swap the "normal" read/write instruction from previous experiment with SIMD one to test how does the SIMD improve the throughput.
+
+NEON has much less freedom then regular instructions, especially on the choice of operand and immediate offset.
+I managed to write a variety of tests for instruction combinations relatively comprehensively:
+- `Read_4x1_ldur`: use 1 `ldur` SIMD instruction to load a 4 bytes scalar to a vector register from memory.
+- `Read_4x1_ldr` : use 1 `ldr` instruction to load 4 bytes to a general purpose register from memory.
+- `Read_4x2_ldur`: use 2 `ldur` SIMD instructions, each loading a 4 bytes scalar to a vector register from memory.
+- `Read_4x2_ldr`: use 2 `ldr` instructions, each loading 4 bytes to a general purpose from memory.
+- `Read_4x3_ldur`: use 3 `ldur` SIMD instructions, each loading a 4 bytes scalar to a vector register from memory.
+- `Read_4x3_ldr`: use 3 `ldr` instructions, each loading 4 bytes to a general purpose from memory.
+- `Read_4x4_ldur`: use 4 `ldur` SIMD instructions, each loading a 4 bytes scalar to a vector register from memory.
+- `Read_4x4_ldr`: use 4 `ldr` instructions, each loading 4 bytes to a general purpose from memory.
+- `Read_8x3_ldr`: use 3 `ldr` instructions, each loading 8 bytes to a general purpose from memory.
+- `Read_8x3_ld1`: use 3 `ld1` SIMD instructions, each loading 8 bytes to a vector register from memory.
+- `Read_16x3`: use 3 `ld1` SIMD instructions, each loading 16 bytes to a vector register from memory.
+- `Read_16x4x1`: use 1 `ld1` SIMD instructions with 4 destination vector registers, loading 4*16 bytes to 4 vector registers
+- `Read_16x4x2`: use 2 `ld1` SIMD instructions with 4 destination vector registers, each loading 4*16 bytes to 4 vector registers, each iteration loading 4*16*2 bytes in total.
+- `Read_16x4x3`: use 3 `ld1` SIMD instructions with 4 destination vector registers, each loading 4*16 bytes to 4 vector registers, each iteration loading 4*16*3 bytes in total.
+
+```
+CPU Freq: 3461826780, FileSize: 1071269247
+
+--- Read_4x1_ldur ---
+
+Min: 267887035 (77.383142ms) 12.892953GB/s PF: 0 (0.00 faults/second)
+Max: 271085835 (78.307163ms) 12.740817GB/s PF: 0 (0.00 faults/second)
+Avg: 268166365 (77.463831ms) 12.879524GB/s PF: 0 (0.00 faults/second)
+
+--- Read_4x1_ldr ---
+
+Min: 267867954 (77.377631ms) 12.893872GB/s PF: 0 (0.00 faults/second)
+Max: 270824489 (78.231670ms) 12.753112GB/s PF: 0 (0.00 faults/second)
+Avg: 268289692 (77.499456ms) 12.873603GB/s PF: 0 (0.00 faults/second)
+
+--- Read_4x2_ldur ---
+
+Min: 133935650 (38.689299ms) 25.787421GB/s PF: 0 (0.00 faults/second)
+Max: 148690354 (42.951414ms) 23.228507GB/s PF: 0 (0.00 faults/second)
+Avg: 134413714 (38.827394ms) 25.695704GB/s PF: 0 (0.00 faults/second)
+
+--- Read_4x2_ldr ---
+
+Min: 133935725 (38.689320ms) 25.787407GB/s PF: 0 (0.00 faults/second)
+Max: 144703031 (41.799616ms) 23.868574GB/s PF: 0 (0.00 faults/second)
+Avg: 134255746 (38.781763ms) 25.725938GB/s PF: 0 (0.00 faults/second)
+
+--- Read_4x3_ldur ---
+
+Min: 93009538 (26.867184ms) 37.134417GB/s PF: 0 (0.00 faults/second)
+Max: 94392471 (27.266665ms) 36.590365GB/s PF: 0 (0.00 faults/second)
+Avg: 93259650 (26.939433ms) 37.034827GB/s PF: 0 (0.00 faults/second)
+
+--- Read_4x3_ldr ---
+
+Min: 93007016 (26.866456ms) 37.135424GB/s PF: 0 (0.00 faults/second)
+Max: 95476428 (27.579782ms) 36.174950GB/s PF: 0 (0.00 faults/second)
+Avg: 93149698 (26.907672ms) 37.078542GB/s PF: 0 (0.00 faults/second)
+
+--- Read_4x4_ldur ---
+
+Min: 93012389 (26.868008ms) 37.133279GB/s PF: 0 (0.00 faults/second)
+Max: 103425767 (29.876066ms) 33.394531GB/s PF: 0 (0.00 faults/second)
+Avg: 93144158 (26.906071ms) 37.080747GB/s PF: 0 (0.00 faults/second)
+
+--- Read_4x4_ldr ---
+
+Min: 93015281 (26.868843ms) 37.132125GB/s PF: 0 (0.00 faults/second)
+Max: 93430484 (26.988781ms) 36.967110GB/s PF: 0 (0.00 faults/second)
+Avg: 93097646 (26.892636ms) 37.099273GB/s PF: 0 (0.00 faults/second)
+
+--- Read_8x3_ld1 ---
+
+Min: 46503730 (13.433292ms) 74.270494GB/s PF: 0 (0.00 faults/second)
+Max: 48177372 (13.916748ms) 71.690399GB/s PF: 0 (0.00 faults/second)
+Avg: 46604860 (13.462505ms) 74.109332GB/s PF: 0 (0.00 faults/second)
+
+--- Read_8x3_ldr ---
+
+Min: 46503273 (13.433160ms) 74.271224GB/s PF: 0 (0.00 faults/second)
+Max: 47132369 (13.614884ms) 73.279894GB/s PF: 0 (0.00 faults/second)
+Avg: 46573099 (13.453330ms) 74.159870GB/s PF: 0 (0.00 faults/second)
+
+--- Read_16x3 ---
+
+Min: 23251459 (6.716529ms) 148.543582GB/s PF: 0 (0.00 faults/second)
+Max: 26099378 (7.539192ms) 132.334763GB/s PF: 0 (0.00 faults/second)
+Avg: 23284621 (6.726108ms) 148.332024GB/s PF: 0 (0.00 faults/second)
+
+--- Read_16x4x1 ---
+
+Min: 23251443 (6.716524ms) 148.543684GB/s PF: 0 (0.00 faults/second)
+Max: 23468567 (6.779244ms) 147.169403GB/s PF: 0 (0.00 faults/second)
+Avg: 23278073 (6.724217ms) 148.373749GB/s PF: 0 (0.00 faults/second)
+
+--- Read_16x4x2 ---
+
+Min: 23251451 (6.716526ms) 148.543633GB/s PF: 0 (0.00 faults/second)
+Max: 25561931 (7.383943ms) 135.117140GB/s PF: 0 (0.00 faults/second)
+Avg: 23282123 (6.725386ms) 148.347943GB/s PF: 0 (0.00 faults/second)
+
+--- Read_16x4x3 ---
+
+Min: 23251440 (6.716523ms) 148.543703GB/s PF: 0 (0.00 faults/second)
+Max: 23978329 (6.926496ms) 144.040688GB/s PF: 0 (0.00 faults/second)
+Avg: 23298519 (6.730123ms) 148.243545GB/s PF: 0 (0.00 faults/second)
+```
+Analysis:
+- when loading data that no wider than 64bit, SIMD instructions show no advantage over normal instructions
+- using 128bit NEON load instruction increase the throughput by 2x compares to 64bit normal load.
+- the number of NEON read ports are 3, identical to that of normal read ports.
+- NEON read throughput top out at 148GB/s, which is about 45bytes/cycle
+
 ## 31/10/2024
 ### Register renaming
 To achieve instruction level parallelism, the less dependencies the better. There are cases called false-dependency which will impede CPU from executing instructions as parallel as possible even if the dependency is kind of "fake".
@@ -105,6 +239,36 @@ As we can see,
 - `Read_x4` is intresting, its throughput is exactly same as `Read_x2`, weird.
 
 It seems that M3 MAX has 3 read ports
+
+#### updated 2/11/2024
+I tested on `ldrb` as opposed to `ldr` and got very intresting results, ldrb has regression at 3 reads variant.
+```
+CPU Freq: 4004648690, FileSize: 1071269247
+
+--- Read_x1 ---
+
+Min: 1072035007 (267.697641ms) 3.726956GB/s PF: 0 (0.00 faults/second)
+Max: 1083107683 (270.462597ms) 3.688855GB/s PF: 0 (0.00 faults/second)
+Avg: 1072994451 (267.937224ms) 3.723623GB/s PF: 0 (0.00 faults/second)
+
+--- Read_x2 ---
+
+Min: 535772082 (133.787536ms) 7.457326GB/s PF: 0 (0.00 faults/second)
+Max: 553037887 (138.098977ms) 7.224509GB/s PF: 0 (0.00 faults/second)
+Avg: 536390394 (133.941935ms) 7.448729GB/s PF: 0 (0.00 faults/second)
+
+--- Read_x3 ---
+
+Min: 714590935 (178.440355ms) 5.591209GB/s PF: 0 (0.00 faults/second)
+Max: 715631766 (178.700261ms) 5.583077GB/s PF: 0 (0.00 faults/second)
+Avg: 714993871 (178.540972ms) 5.588058GB/s PF: 0 (0.00 faults/second)
+
+--- Read_x4 ---
+
+Min: 372070050 (92.909536ms) 10.738373GB/s PF: 0 (0.00 faults/second)
+Max: 374967095 (93.632956ms) 10.655407GB/s PF: 0 (0.00 faults/second)
+Avg: 372446858 (93.003628ms) 10.727509GB/s PF: 0 (0.00 faults/second)
+```
 
 Experiment results for **write**
 ```
