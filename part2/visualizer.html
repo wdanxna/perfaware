@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Line Graph</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f9;
+        }
+        canvas {
+            max-width: 90%;
+            max-height: 90%;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="lineChart"></canvas>
+    <script>
+const l1 = `
+124992, 171.11
+128064, 171.11
+129600, 171.10
+130368, 171.10
+130752, 171.10
+130944, 171.10
+131136, 171.08
+131328, 170.71
+131520, 170.77
+131904, 167.05
+132672, 163.91
+134208, 157.22
+137280, 148.57
+`
+        const csvData = `
+124992, 171.20
+128064, 171.20
+129600, 171.19
+130368, 171.20
+130752, 171.19
+130944, 171.19
+131136, 171.19
+524352, 106.11
+917568, 106.48
+1704000, 106.49
+3276864, 104.54
+6422592, 104.43
+17236032, 102.24
+17629248, 103.00
+18415680, 103.05
+19988544, 103.76
+23134272, 102.83
+33947712, 103.85
+34340928, 102.65
+35127360, 103.60
+36700224, 102.57
+39845952, 104.47
+42336384, 100.61
+42729600, 99.27
+43516032, 100.63
+45088896, 101.26
+48234624, 97.60
+50331840, 97.58
+50725056, 96.15
+51118272, 96.10
+51904704, 98.07
+53477568, 95.29
+56623296, 96.35
+104857728, 90.12
+105250944, 88.49
+105644160, 89.07
+106430592, 87.44
+108003456, 95.60
+111149184, 92.57
+        `;
+
+        function parseCSV(csv) {
+            const lines = csv.trim().split('\n');
+            const labels = [];
+            const data = [];
+
+            lines.forEach(line => {
+                const [x, y] = line.split(',').map(Number);
+                labels.push(x/(1024*1024));
+                data.push(y);
+            });
+
+            return { labels, data };
+        }
+
+        const parsedData = parseCSV(csvData);
+
+        const ctx = document.getElementById('lineChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: parsedData.labels,
+                datasets: [{
+                    label: 'Bandwidth',
+                    data: parsedData.data,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        // type: 'logarithmic',
+                        position: 'bottom',
+                        title: {
+                            display: true,
+                            text: 'Accessed MiB'
+                        }
+                    },
+                    y: {
+                        // type: 'logarithmic',
+                        title: {
+                            display: true,
+                            text: 'Read Bandwidth (GB/s)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

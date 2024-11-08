@@ -1,5 +1,92 @@
 My homework assignment for performance awareness programming
-## 32/10/2024
+## 9/11/2024
+![alt text](arm64-condition-code.png)
+![alt text](L1ICache.png)
+![alt text](cache-latency.png)
+![alt text](image-2.png)
+
+
+Cache sizes:
+- L1 Cache:
+Performance Cores: 192 KB instruction cache + 128 KB data cache per core (total of 12 performance cores).
+Efficiency Cores: 128 KB instruction cache + 64 KB data cache per core (total of 4 efficiency cores) 23.
+- L2 Cache:
+Performance Cores: 32 MB shared L2 cache per cluster (with two clusters of performance cores).
+Efficiency Cores: 4 MB L2 cache per cluster 13.
+- L3 Cache:
+The M3 Max is estimated to have a shared last-level cache (LLC) of 48 MB, although Apple has not officially confirmed this size 46.
+
+### Test design
+#### single loop version
+In This test we construct an assembly code that do a single loop, in which we issue a bunch of loads
+but limit the access within a range by masking the offset. For example, to limit the access range within 2^N, we can use a mask of value 2^N-1, and calculate the offset by `offset & mask` then the offset will wrap around when it reachs 2^N.
+
+To hide the overhead of branching and loop counter maintaince, we first analyze how many cycles those overhead would take. then we can pile additional loads operation such that the cycles spend on loads outweight the that of the bookkeeping. Since the CPU parallel loads and arithmetics, the total cycles spend would be the maximum of all parallel works, thus we can hide the cost of bookkeeping by issuing excessive loads.
+
+In the code below, the longest dependency chain I can think of is those that involves `x3`
+It might take at least 3 cycles in a loop. Since M3 Max has 3 load ports, that means it can afford to loads 3*3=9 loads per iteration at least. To make a little bit headroom, I added another 3 loads that make the total amount of loads to 4*3=12, which will certainly take 4 cycles to complete and will effectively hide the cost of offset updating and branch taking.
+```c
+_Read_mask:
+mov x3, #0 //offset
+mov x4, x1 //base pointer
+mov x8, #0 //total
+ldr x7, [x1] //mask
+
+1:
+    //read x 3, since there are 3 read ports
+    //3 load, 1 cycle. To hide 3 cycles offset update, write 4 sets of ldr to make sure it at least takes 4 cycles to run
+    ldr q0, [x4, #0]
+    ldr q0, [x4, #16]
+    ldr q0, [x4, #32]
+
+    ldr q0, [x4, #48]
+    ldr q0, [x4, #64]
+    ldr q0, [x4, #80]
+
+    ldr q0, [x4, #96]
+    ldr q0, [x4, #112]
+    ldr q0, [x4, #128]
+
+    ldr q0, [x4, #144]
+    ldr q0, [x4, #160]
+    ldr q0, [x4, #176]
+
+    //update offset
+    //dependency chain, at least 3 cycles
+    add x3, x3, #192 //cycle 1
+    and x3, x3, x7  //cycle 2
+
+    mov x4, x1
+    add x4, x4, x3 //cycle 3
+
+
+
+    add x8, x8, #192
+    cmp x0, x8
+    b.ne 1b
+    ret
+```
+
+use above code to do a repetition test, we started by setting the range to 2^10 = 1kib (mask = 2^10-1), then gradually increased the mask by power of 2 (BTW, that's how the mask works, we can only do power of 2 granularity). The result is shown as below.
+![alt text](image-1.png)
+
+we can discern clearly from the graph that where's the boundary of the L1 cache (around 128KiB)
+and can kind of tell where's the L2 cache which around 30Mib, but L3 cache is not visible because of the granulariy.
+
+#### double loop version
+To address the granularity issue we encountered in single loop test we can use a double loop design. In the single loop design, it loads 192 bytes per iteration, we can design a test that has arbitrary granularities as long as its multiple of 192.
+
+For example, we choose the granularity of k*192, then we can chop 1GB into k*192 chunks, in the outer loop, we iterate 1GB/(k*192) times (that will make the total amount of read to 1GB), in the inner loop, we iterate k times.
+
+using the double loop version we have more freedom to choose the granularity and ranges,
+so I hand picked some ranges did some tests.
+![alt text](image-3.png)
+![alt text](image-4.png)
+![alt text](image-5.png)
+
+To my surprise, the bandwidth difference between the L2 and L3 is not that significant. We don't see dramatic falloffs at 32Mib (L2 cache size) and 48Mib (L3 cache size) as anticipated.
+
+## 2/11/2024
 ### ARM64 SIMD (NEON)
 There are 32 128bits vector registers.
 

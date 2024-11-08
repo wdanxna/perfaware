@@ -37,8 +37,113 @@
     .global     _Read_16x4x1
     .global     _Read_16x4x2
     .global     _Read_16x4x3
+
+
+    .global     _Read_mask
+    .global     _Read_mask2
+    .global     _DoubleLoop_Cache_Test
     .align      2                     // Align the function to a 4-byte boundary
 
+
+//x0: outer loop iteration count, this determines how much memory to access in total
+//x1: inner loop iteration count, this controls the access footprint
+//x2: base pointer
+_DoubleLoop_Cache_Test:
+1:
+    mov x3, x1 //reset inner loop count
+    mov x4, x2 //reset base pointer
+    2: //inner loop, read 192 byte per iteration
+        ldr q0, [x4, #0]
+        ldr q0, [x4, #16]
+        ldr q0, [x4, #32]
+
+        ldr q0, [x4, #48]
+        ldr q0, [x4, #64]
+        ldr q0, [x4, #80]
+
+        ldr q0, [x4, #96]
+        ldr q0, [x4, #112]
+        ldr q0, [x4, #128]
+
+        ldr q0, [x4, #144]
+        ldr q0, [x4, #160]
+        ldr q0, [x4, #176]
+
+        add x4, x4, #192
+        subs x3, x3, #1
+        b.ne 2b
+    subs x0, x0, #1
+    b.ne 1b
+    ret
+
+
+//Cache test
+//read mask from x1
+//assuming L1D cache is 128kiB = 2^17, mask = 2^17-1
+//L2 cache is 32MB = 2^25, mask = 2^25-1
+//L3 cache is 48MB = 2^25 + 2^24, mask = 2^26-1
+_Read_mask:
+mov x3, #0 //offset
+mov x4, x1 //base pointer
+mov x8, #0 //total
+ldr x7, [x1] //mask
+
+1:
+    //read x 3, since there are 3 read ports
+    //3 load, 1 cycle. To hide 3 cycles offset update, write 4 sets of ldr to make sure it at least takes 4 cycles to run
+    ldr q0, [x4, #0]
+    ldr q0, [x4, #16]
+    ldr q0, [x4, #32]
+
+    ldr q0, [x4, #48]
+    ldr q0, [x4, #64]
+    ldr q0, [x4, #80]
+
+    ldr q0, [x4, #96]
+    ldr q0, [x4, #112]
+    ldr q0, [x4, #128]
+
+    ldr q0, [x4, #144]
+    ldr q0, [x4, #160]
+    ldr q0, [x4, #176]
+
+    //update offset
+    //dependency chain, at least 3 cycles
+    add x3, x3, #192 //cycle 1
+    and x3, x3, x7  //cycle 2
+
+    mov x4, x1
+    add x4, x4, x3 //cycle 3
+
+
+
+    add x8, x8, #192
+    cmp x0, x8
+    b.ne 1b
+    ret
+
+
+
+_Read_mask2:
+mov x2, x1 //save base pointer
+mov x3, #0 //offset
+mov x8, #0 //total
+ldr x7, [x1] //mask
+1:
+    mov x1, x2 //ld1 do post-update, it will modify the base pointer
+    //read x 3, since there are 3 read ports
+    ld1 {v0.2D, v1.2D, v2.2D}, [x1], x3 //post update
+    ld1 {v0.2D, v1.2D, v2.2D}, [x1] //dependent on previous inst, these two ld1 cost at least 2 cycles.
+
+    //update offset
+    //dependency chain, at least 2 cycles
+    add x3, x3, #96
+    and x3, x3, x7
+
+    add x8, x8, #96
+    cmp x0, x8
+    b.ne 1b
+    ret
 
 //SIMD read
 _Read_4x1_ldur:

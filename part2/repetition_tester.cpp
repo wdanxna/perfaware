@@ -185,8 +185,8 @@ static b32 IsTesting(repetition_tester *Tester) {
         //check if enough time has elapsed since the last new MinTime
         if ((CurrentTime - Tester->TestsStartedAt) > Tester->TryForTime) {
             Tester->Mode = TestMode_Completed;
-            printf("\n");
-            PrintResults(Tester->Results, Tester->CPUTimerFreq, Tester->TargetProcessedByteCount);
+            // printf("\n");
+            // PrintResults(Tester->Results, Tester->CPUTimerFreq, Tester->TargetProcessedByteCount);
         }
     }
 
