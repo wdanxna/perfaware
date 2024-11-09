@@ -1,4 +1,54 @@
 My homework assignment for performance awareness programming
+
+## 10/11/2024
+Designed an experiment to test how does unaligned memory read affect the bandwidth.
+### Aligned Allocate
+First we need a function to allocate a memory region that its starting address is aligned at specific number, for example,
+64B, that means, the base pointer returned by such a function should awlays be multiple of 64.
+
+Normally, such a function is implemented in the following steps:
+1. malloc a block of memory that is at least 64B + sizeof(void*) get the pointer as `base`
+2. find the next 64B aligned address `ptr` ahead of `base` such that there is big enough space between `base` and `ptr` that can hold an additional pointer `(base + 64-1 + sizeof(void*)) & ~(64-1)`
+3. store the `base` at that additional pointer `*(ptr - sizeof(void*)) = base`
+4. return the `ptr` as the starting address
+5. when deallocating, restore `base` from `ptr`, then free it as usual.
+
+![alt text](aligned-alloc.jpeg)
+
+### effect of unaligned read
+Constructing 2 assembly which are almost identical, except that the second one has an offset on its base pointer.
+
+both functions read 64B (a cache line) per iteration, the `UnAligned_Read` has an arbitrary offset added on the base pointer
+```c
+//x0, count
+//x1, base pointer
+_Align_Read:
+1:
+    ldr q0, [x1, #0]
+    ldr q0, [x1, #16]
+    ldr q0, [x1, #32]
+    ldr q0, [x1, #48]
+
+    add x1, x1, #64
+    subs x0, x0, #64
+    bgt 1b
+    ret
+
+_UnAlign_Read:
+add x1, x1, #60
+1:
+    ldr q0, [x1, #0]
+    ldr q0, [x1, #16]
+    ldr q0, [x1, #32]
+    ldr q0, [x1, #48]
+
+    add x1, x1, #64
+    subs x0, x0, #64
+    bgt 1b
+    ret
+```
+The experiement showed that the unaligned version has a 2%-3% of bandwidth degradation compared to its aligned counterpart.
+
 ## 9/11/2024
 ![alt text](arm64-condition-code.png)
 ![alt text](L1ICache.png)

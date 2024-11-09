@@ -42,7 +42,38 @@
     .global     _Read_mask
     .global     _Read_mask2
     .global     _DoubleLoop_Cache_Test
+
+    .global     _Align_Read
+    .global     _UnAlign_Read
     .align      2                     // Align the function to a 4-byte boundary
+
+
+//x0, count
+//x1, base pointer
+_Align_Read:
+1:
+    ldr q0, [x1, #0]
+    ldr q0, [x1, #16]
+    ldr q0, [x1, #32]
+    ldr q0, [x1, #48]
+
+    add x1, x1, #64
+    subs x0, x0, #64
+    bgt 1b
+    ret
+
+_UnAlign_Read:
+add x1, x1, #60
+1:
+    ldr q0, [x1, #0]
+    ldr q0, [x1, #16]
+    ldr q0, [x1, #32]
+    ldr q0, [x1, #48]
+
+    add x1, x1, #64
+    subs x0, x0, #64
+    bgt 1b
+    ret
 
 
 //x0: outer loop iteration count, this determines how much memory to access in total

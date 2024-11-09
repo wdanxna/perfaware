@@ -222,6 +222,9 @@ extern "C" {
     void Read_mask2(u64 count, u8* data);
 
     void DoubleLoop_Cache_Test(u64 outerCount, u64 innerCount, u8* data);
+
+    void Align_Read(u64 count, u8* data);
+    void UnAlign_Read(u64 count, u8* data);
 };
 
 test_function TestFunctions[] = {
@@ -260,7 +263,10 @@ test_function TestFunctions[] = {
     // {"Read_16x4x2", Read_16x4x2},
     // {"Read_16x4x3", Read_16x4x3}
 
-    {"Read_mask", Read_mask}
+    // {"Read_mask", Read_mask}
+
+    {"Align_Read", Align_Read},
+    {"UnAlign_Read", UnAlign_Read}
 };
 
 static constexpr u64 MakeMultipleOfK(u64 n, u64 k) {
@@ -272,7 +278,7 @@ static constexpr u64 MakeMultipleOfK(u64 n, u64 k) {
 //reproduce what video had done, by gradually increasing the access range by power of 2
 #define Version_2_Cache_Test 0
 //double loop version that subdivides a memory region into bespoke pieces, achieving finer granularity compares to the power of 2 version
-#define Version_3_Cache_Test 1
+#define Version_3_Cache_Test 0
 
 int main(int argc, char** argv) {
 
@@ -446,5 +452,35 @@ int main(int argc, char** argv) {
     }
 
 #endif
+
+    constexpr u64 KiByte = 1024;
+    constexpr u64 MiByte = 1024*1024;
+    constexpr u64 GiByte = 1024*1024*1024;
+
+    buffer Dest = AlignedAlloc(GiByte, 64);
+    printf("size: %zu, freq: %llu\n", Dest.Count, CPUTimerFreq);
+
+    for (int i = 0; i < Dest.Count; i++) {
+        Dest.Data[i] = i;
+    }
+
+    repetition_tester testers[ArrayCount(TestFunctions)] = {};
+    for (int i = 0; i < ArrayCount(TestFunctions); i++) {
+        auto tester = testers + i;
+        auto func = TestFunctions[i].Func;
+        NewTestWave(tester, Dest.Count, CPUTimerFreq);
+        while (IsTesting(tester)) {
+            BeginTime(tester);
+            func(Dest.Count, Dest.Data);
+            EndTime(tester);
+            CountBytes(tester, Dest.Count);
+        }
+
+        auto amount = tester->TargetProcessedByteCount;
+        auto seconds = SecondsFromCPUTime(tester->Results.MinTime, CPUTimerFreq);
+        auto bandwidth = amount / (GiByte * seconds);
+        printf("%s: %.2f GB/s\n", TestFunctions[i].Name, bandwidth);
+    }
+
     return 0;
 }

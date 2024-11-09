@@ -70,3 +70,24 @@ static void FreeBuffer(buffer *Buffer)
     }
     *Buffer = {};
 }
+
+static buffer AlignedAlloc(u64 size, u64 alignment) {
+    assert((alignment & 1) == 0);//alignment must be power of 2
+    u64 allocSize = size + sizeof(void*) + alignment - 1 ;
+    u64* mem = (u64*)malloc(allocSize);
+    u64 ptr = ((u64)mem + sizeof(void*) + alignment - 1) & ~(alignment - 1);
+    *((u64*)ptr - 1) = (u64)mem;
+
+    buffer ret = {
+        .Count = ((allocSize - (ptr - (u64)mem)) / alignment)*alignment,
+        .Data = (u8*)ptr
+    };
+
+    return ret;
+}
+
+static void AlignedFree(buffer* buffer) {
+    u64* mem = (u64*)*((u64*)buffer->Data - 1);
+    buffer->Data = (u8*)mem;
+    FreeBuffer(buffer);
+}
