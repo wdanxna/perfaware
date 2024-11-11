@@ -45,7 +45,20 @@
 
     .global     _Align_Read
     .global     _UnAlign_Read
+
+    .global     _Jump_Read
     .align      2                     // Align the function to a 4-byte boundary
+
+//x0, count
+//x1, distance
+//x2, base pointer
+_Jump_Read:
+1:
+    ldr x3, [x2]
+    ldr x3, [x2, x1]
+    subs x0, x0, #16
+    bgt 1b
+    ret
 
 
 //x0, count
@@ -92,15 +105,7 @@ _DoubleLoop_Cache_Test:
         ldr q0, [x4, #64]
         ldr q0, [x4, #80]
 
-        ldr q0, [x4, #96]
-        ldr q0, [x4, #112]
-        ldr q0, [x4, #128]
-
-        ldr q0, [x4, #144]
-        ldr q0, [x4, #160]
-        ldr q0, [x4, #176]
-
-        add x4, x4, #192
+        add x4, x4, #96
         subs x3, x3, #1
         b.ne 2b
     subs x0, x0, #1

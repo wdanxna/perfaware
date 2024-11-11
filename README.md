@@ -1,4 +1,99 @@
 My homework assignment for performance awareness programming
+## 11/11/2024
+
+### trashing the L1 cache
+Today's homework involves designing a program to trash the L1 data cache by creating a memory access
+pattern that repeatedly evicts the same L1 cache line, thereby continuously triggering L1 cache misses.
+
+For apple M3, it has a 128KiB, 8 way, 64B line L1 cache. 
+since it's an 8 way cache, it should have `((128*1024)/64)/8 = 256` sets, with 8 cache lines per sets.
+it needs 8 bits to address 256 sets, 3 bits to address 8 ways, and 6 bits to address into a 64B cache line.
+This means it needs `8 + 3 + 6 = 17` bottom bits to index into a specific cache line in L1 (with 8 bits to locate the set and 3 bits to locate the way)
+
+Therefore, if we load a specific address and its value is cached in L1, adding a `2^17 = 128K` offset to the address will keep the bottom 17 bits unchanged. This means the content at the new address will be brought into the same L1 entry as the previous address when accessed.
+
+Based on the above analysis, we can first allocate 1MB of memory and load back and forth between the base address `x` and `x+128k`. Normally, reading 2 cache lines would only occupy 2 out of the 256*8 L1 cache slots, and the throughput should match that of an L1 cache hit. However, since these 2 lines coincide in the same L1 cache slot, they will evict each other, causing repeated cache misses.
+
+we can construct an array of `distance` which consists of how many bytes to offset away from base address.
+`u64 distance[] = {2, 65, 128*KiByte, 128*KiByte+64};`
+
+- distance 2 causes loading from base address x and x+2 repeatedly, since these 2 addresses reside on the same cache line, loading from both should achieve maximum L1 cache throughput.
+- distance 65 offsets `x` to the next cache line, it's almost impossible to trigger any cache miss.
+- distance 128k, like the analysis above, during reading back and forth between `x` and `x+128k` should trigger reapted L1 cache misses.
+- distance 128k+64, by offseting 1 cache line away from the previous distance, its throughput should get back to the level of an L1 cahce hit again.
+
+```
+distance: 2, BW: 56.56 GB/s
+distance: 65, BW: 56.57 GB/s
+distance: 131072, BW: 49.48 GB/s
+distance: 131136, BW: 56.58 GB/s
+```
+As the restults shown above, at distance 128K, its throughput did take a hit by around 12.5%.
+
+### cache test revisit
+Following the "Cache Sets and Indexing" lesson, I think I'd better reporoduce what Casey's implementation on unaligned read, targeting both offset and cache levels. Previously, what I did was effectively testing unaligned read across 1GB memory region. This time however, I'll design the code so that it can test on both L1, L2, L3 as well as memory.
+
+The new implementation located at `cache_test.cpp`
+```
+Region(Byte), Offset, Throughput
+8256, 0, 171
+8256, 1, 171
+8256, 2, 171
+8256, 3, 171
+8256, 15, 171
+8256, 16, 171
+8256, 17, 171
+8256, 31, 171
+8256, 32, 171
+8256, 33, 171
+8256, 63, 171
+8256, 64, 171
+8256, 65, 171
+2097216, 0, 106
+2097216, 1, 101
+2097216, 2, 102
+2097216, 3, 101
+2097216, 15, 101
+2097216, 16, 106
+2097216, 17, 101
+2097216, 31, 101
+2097216, 32, 106
+2097216, 33, 101
+2097216, 63, 101
+2097216, 64, 106
+2097216, 65, 101
+10485792, 0, 104
+10485792, 1, 99
+10485792, 2, 100
+10485792, 3, 99
+10485792, 15, 99
+10485792, 16, 104
+10485792, 17, 99
+10485792, 31, 99
+10485792, 32, 104
+10485792, 33, 99
+10485792, 63, 99
+10485792, 64, 104
+10485792, 65, 99
+1073741856, 0, 86
+1073741856, 1, 82
+1073741856, 2, 83
+1073741856, 3, 81
+1073741856, 15, 81
+1073741856, 16, 84
+1073741856, 17, 81
+1073741856, 31, 81
+1073741856, 32, 82
+1073741856, 33, 80
+1073741856, 63, 82
+1073741856, 64, 82
+1073741856, 65, 81
+```
+
+- As seen above, it seems that unaligned read has **no** effect on L1 cache read.
+- on the other hand, for L2, L3 cache access, unaligned read has 5% panelty.
+- in L2, L3 read, whenever the read is **16 byte** aligned, it achieves the best throughput.
+- unaligned read observed no obvious effect on large read
 
 ## 10/11/2024
 Designed an experiment to test how does unaligned memory read affect the bandwidth.
