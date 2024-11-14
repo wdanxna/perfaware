@@ -47,7 +47,26 @@
     .global     _UnAlign_Read
 
     .global     _Jump_Read
+    .global     _Stride_Read
     .align      2                     // Align the function to a 4-byte boundary
+
+//x0, outer count
+//x1, inner count
+//x2, stride
+//x3, base pointer
+_Stride_Read:
+1:
+    mov x4, x1 //reset inner count
+    mov x5, x3 //reset base pointer
+    2:
+        ld1 {v0.2D, v1.2D, v2.2D, v3.2D}, [x5] //read 64 bytes
+        add x5, x5, x2 //add stride
+        subs x4, x4, #1
+        b.ne 2b
+    subs x0, x0, #1
+    b.ne 1b
+    ret
+
 
 //x0, count
 //x1, distance

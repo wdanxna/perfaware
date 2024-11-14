@@ -28,7 +28,59 @@ distance: 65, BW: 56.57 GB/s
 distance: 131072, BW: 49.48 GB/s
 distance: 131136, BW: 56.58 GB/s
 ```
-As the restults shown above, at distance 128K, its throughput did take a hit by around 12.5%.
+As the restults shown above, at distance 128K, its throughput did take a hit by around 12.5%, and by merely loading 1 cache line away from that address, the throughput gets back to a normal level.
+
+#### UPDATE:
+This experiement design overall is sound for demonstrating cache conflicts, but there is a flaw:
+- throughput degradation is also seen when distance is multiple of 256:
+    ```
+    distance: 0, BW: 56.81
+    distance: 64, BW: 56.80
+    distance: 128, BW: 56.79
+    distance: 192, BW: 56.80
+    distance: 256, BW: 49.69
+    distance: 320, BW: 56.81
+    distance: 384, BW: 56.79
+    distance: 448, BW: 56.80
+    distance: 512, BW: 49.73
+    distance: 131072, BW: 49.68
+    distance: 131136, BW: 56.78
+    ```
+    As the results above, the original analysis cannot explain how's that. If a cache line is virtually indexed
+    and virtuall tagged, by adding 256 = 2^8, 2 extra bits in addition to the bottom 6 bits are fixed, will not guarantee a cache conflict.
+
+#### Cache behaviour revisit
+Having pondering and tinckering on this subject for few days, I thought I've gain enough insight about cache behaviour that allows me to comfortably moving forward.
+
+I reproduced Casey's experiment on my machine and produced the chart down below.
+![alt text](image-6.png)
+
+The results is not very far from what Casey had produced. In which:
+- Every 128 stride takes 2% hit
+- Every 256 stride takes 25% hit
+- Every 1024 stride takes 50% hit
+
+Although the results debunks the theoretical cache indexing behaviour I described previously, it do show that, ocuppying bits that are higher than the bottom 6 bits causes cache thrashing.
+
+In Casey's experiemnt design, using a double loop read, the code can be represented as below:
+```c
+for (int strId = 0; strId < 128; strId++) {
+    int stride = strId * 64;
+    for (int i = 0; i < 64; i++) {
+        for (int j = 0; j < 256; j++) {
+            read_a_cache_line(ptr);//64B read
+            ptr += stride;
+        }
+    }
+}
+```
+The design says, it'll experiment on various strides, starting from 0 stride to 128 strides, and a stride is always 64B (a cache line).
+
+Then for each experiment, reads 1 cache line a time in a striding manner for 256 times, then repeat 64 times, that makes `64*256*64` bytes read in total.
+
+The results from this experiment is fascinating, although my theretical model for cache indexing is out right wrong, and I have no idea how does a cache line is actually indexed. The experiment allows me to take a glimpse into the internal mechanism.
+
+For example, when taking 128 stride, 2^7 = 128, which means 1 bit is lost for indexing, which means every reads that are seperating by 128 bytes have only half the cache to use. Similarly, every 256 stride reads have a quarter and every 1024 stride have only 1/16 cache to use! For 128KiB L1 cache size, 128×1024/16 = 8kiB, since we read 64*256*64 = 1Mb in total but only have 8k cache available, the rate of L1 cache miss is very high, hence causing significant throughput degradation.
 
 ### cache test revisit
 Following the "Cache Sets and Indexing" lesson, I think I'd better reporoduce what Casey's implementation on unaligned read, targeting both offset and cache levels. Previously, what I did was effectively testing unaligned read across 1GB memory region. This time however, I'll design the code so that it can test on both L1, L2, L3 as well as memory.
