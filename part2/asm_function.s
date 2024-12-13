@@ -48,7 +48,67 @@
 
     .global     _Jump_Read
     .global     _Stride_Read
+
+    .global     _Normal_Write
+    .global     _Nontemporal_Write
     .align      2                     // Align the function to a 4-byte boundary
+
+
+//x0, outer count
+//x1, inner count
+//x2, read base pointer
+//x3, write base pointer
+_Normal_Write:
+1:
+    mov x4, x1 //reset inner count
+    mov x5, x2 //reset read pointer
+    2:
+        //read total 128 bytes of data
+        ldp q0, q1, [x5] //read 32 bytes
+        stp q0, q1, [x3]
+        ldp q0, q1, [x5, #32]
+        stp q0, q1, [x3, #32]
+        ldp q0, q1, [x5, #64]
+        stp q0, q1, [x3, #64]
+        ldp q0, q1, [x5, #96]
+        stp q0, q1, [x3, #96]
+
+
+        add x5, x5, #128
+        add x3, x3, #128
+        subs x4, x4, #1
+        b.ne 2b
+    subs x0, x0, #1
+    b.ne 1b
+    ret
+
+//x0, outer count
+//x1, inner count
+//x2, read base pointer
+//x3, write base pointer
+_Nontemporal_Write:
+1:
+    mov x4, x1 //reset inner count
+    mov x5, x2 //reset read pointer
+    2:
+        //read total 128 bytes of data
+        ldp q0, q1, [x5] //read 32
+        stnp q0, q1, [x3]
+        ldp q0, q1, [x5, #32]
+        stnp q0, q1, [x3, #32]
+        ldp q0, q1, [x5, #64]
+        stnp q0, q1, [x3, #64]
+        ldp q0, q1, [x5, #96]
+        stnp q0, q1, [x3, #96]
+
+        add x5, x5, #128
+        add x3, x3, #128
+        subs x4, x4, #1
+        b.ne 2b
+    subs x0, x0, #1
+    b.ne 1b
+    ret
+
 
 //x0, outer count
 //x1, inner count

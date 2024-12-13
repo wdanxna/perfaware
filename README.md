@@ -1,4 +1,40 @@
-My homework assignment for performance awareness programming
+## 13/12/2024
+```
+ReadBufferSize,AllocateAndTouch,AllocateAndCopy,OpenAllocateAndFRead
+256k,101051.580414,76.150598,18.456757
+512k,53455.320556,75.189374,18.553359
+1024k,27443.686165,74.572810,18.636869
+2048k,13986.674990,74.190009,18.720898
+4096k,7018.699636,73.713919,18.613778
+8192k,3472.206331,72.172064,17.386862
+16384k,1779.588074,69.037073,13.061867
+32768k,848.017797,58.197162,8.468194
+65536k,425.362415,51.778174,8.444608
+131072k,209.449112,44.281018,8.533082
+262144k,103.231846,33.625624,8.591256
+524288k,37.717443,23.760288,8.835653
+```
+![alt text](image-8.png)
+By choosing the 2048K (2MB) as the read buffer size we can achieve the maximum throughput.
+
+Lessons learned: when reading large file, choose a destination buffer with size less than 5MB and read chunk by chunk will give you 2x throughput compared with if you use a large buffer and read once.
+
+## 12/12/2024
+After a long pause Im finally able to get back to the course, previously I was working on the non-temporal writing test, which doesn't get an expected results where the non-temporal write just perform worse compared to normal write most of the time on my M3 MAX. I couldn't find an explaination nor did I could find any bugs in my experiment. So, I decided to skip that part since its that useful anyway.
+
+Before I continue to follow the rest of the part3, I need to re-orgnize my code base, aligning the common utilities with Casey's such as repeatition_test, since my own implementation was starting to deviate too much from Casey's implementation which makes the further progress a little bit inconvenient. I can also use this opportunity to consolidate my understanding of the previous materials.
+
+Tasks:
+- extract out the directory structure for part3, previously I had droped all the code in part2 folder.
+- extract the common utilities into their own folders and align the implementations.
+- add a build mechinism e.g. a make file, that can build certain file with single command.
+
+
+## 15/11/2024
+![alt text](image-7.png)
+understanding the "lanes" and element size through register names.
+
+
 ## 11/11/2024
 
 ### trashing the L1 cache
@@ -273,7 +309,7 @@ and can kind of tell where's the L2 cache which around 30Mib, but L3 cache is no
 #### double loop version
 To address the granularity issue we encountered in single loop test we can use a double loop design. In the single loop design, it loads 192 bytes per iteration, we can design a test that has arbitrary granularities as long as its multiple of 192.
 
-For example, we choose the granularity of k*192, then we can chop 1GB into k*192 chunks, in the outer loop, we iterate 1GB/(k*192) times (that will make the total amount of read to 1GB), in the inner loop, we iterate k times.
+For example, we choose the granularity of `k*192`, then we can chop 1GB into k*192 chunks, in the outer loop, we iterate `1GB/(k*192)` times (that will make the total amount of read to 1GB), in the inner loop, we iterate k times.
 
 using the double loop version we have more freedom to choose the granularity and ranges,
 so I hand picked some ranges did some tests.
